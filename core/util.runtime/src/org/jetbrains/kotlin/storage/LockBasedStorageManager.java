@@ -470,6 +470,11 @@ public class LockBasedStorageManager implements StorageManager {
         protected LockBasedStorageManager getStorageManager() {
             return storageManager;
         }
+
+        @Override
+        public void dropDefault() {
+            defaultValues.clear();
+        }
     }
 
     private static class MapBasedMemoizedFunctionToNotNull<K, V> extends MapBasedMemoizedFunction<K, V> implements MemoizedFunctionToNotNull<K, V> {

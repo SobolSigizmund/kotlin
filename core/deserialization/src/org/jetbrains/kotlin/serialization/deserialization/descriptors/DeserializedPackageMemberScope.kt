@@ -71,6 +71,6 @@ open class DeserializedPackageMemberScope(
     override fun getNonDeclaredVariableNames(location: LookupLocation): Set<Name> = emptySet()
 
     override fun addEnumEntryDescriptors(result: MutableCollection<DeclarationDescriptor>, nameFilter: (Name) -> Boolean) {
-        // Do nothing
+        properties.dropDefault()
     }
 }
