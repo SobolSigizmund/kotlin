@@ -39,7 +39,7 @@ abstract class AbstractBinaryClassAnnotationAndConstantLoader<A : Any, C : Any, 
         storageManager: StorageManager,
         private val kotlinClassFinder: KotlinClassFinder
 ) : AnnotationAndConstantLoader<A, C, T> {
-    private val storage = storageManager.createMemoizedFunction<KotlinJvmBinaryClass, Storage<A, C>> {
+    private val storage = storageManager.createMemoizedFunction<KotlinJvmBinaryClass, Storage<A, C>>(Storage(emptyMap(), emptyMap())) {
         kotlinClass ->
         loadAnnotationsAndInitializers(kotlinClass)
     }

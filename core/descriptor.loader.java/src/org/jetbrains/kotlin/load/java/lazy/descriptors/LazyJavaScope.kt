@@ -71,7 +71,7 @@ abstract class LazyJavaScope(protected val c: LazyJavaResolverContext) : MemberS
 
     protected abstract fun getDispatchReceiverParameter(): ReceiverParameterDescriptor?
 
-    private val functions = c.storageManager.createMemoizedFunction<Name, Collection<SimpleFunctionDescriptor>> {
+    private val functions = c.storageManager.createMemoizedFunction<Name, Collection<SimpleFunctionDescriptor>>(emptyList()) {
         name ->
         val result = LinkedHashSet<SimpleFunctionDescriptor>()
 
@@ -222,7 +222,7 @@ abstract class LazyJavaScope(protected val c: LazyJavaResolverContext) : MemberS
 
     protected abstract fun getPropertyNames(kindFilter: DescriptorKindFilter, nameFilter: (Name) -> Boolean): Collection<Name>
 
-    private val properties = c.storageManager.createMemoizedFunction {
+    private val properties = c.storageManager.createMemoizedFunction(emptyList()) {
         name: Name ->
         val properties = ArrayList<PropertyDescriptor>()
 
