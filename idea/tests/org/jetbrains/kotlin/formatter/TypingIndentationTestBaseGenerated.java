@@ -253,6 +253,12 @@ public class TypingIndentationTestBaseGenerated extends AbstractTypingIndentatio
             doNewlineTest(fileName);
         }
 
+        @TestMetadata("LambdaInCallWithAllightMultilineParameters.after.kt")
+        public void testLambdaInCallWithAllightMultilineParameters() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("idea/testData/indentationOnNewline/LambdaInCallWithAllightMultilineParameters.after.kt");
+            doNewlineTest(fileName);
+        }
+
         @TestMetadata("MultideclarationAfterEq.after.kt")
         public void testMultideclarationAfterEq() throws Exception {
             String fileName = KotlinTestUtils.navigationMetadata("idea/testData/indentationOnNewline/MultideclarationAfterEq.after.kt");
@@ -418,6 +424,12 @@ public class TypingIndentationTestBaseGenerated extends AbstractTypingIndentatio
         @TestMetadata("IsExpressionAfterIs.after.inv.kt")
         public void testIsExpressionAfterIs() throws Exception {
             String fileName = KotlinTestUtils.navigationMetadata("idea/testData/indentationOnNewline/IsExpressionAfterIs.after.inv.kt");
+            doNewlineTestWithInvert(fileName);
+        }
+
+        @TestMetadata("LambdaInCallWithAllightMultilineParameters.after.inv.kt")
+        public void testLambdaInCallWithAllightMultilineParameters() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("idea/testData/indentationOnNewline/LambdaInCallWithAllightMultilineParameters.after.inv.kt");
             doNewlineTestWithInvert(fileName);
         }
 
