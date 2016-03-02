@@ -44,7 +44,7 @@ class ModuleDescriptorImpl @JvmOverloads constructor(
     private var dependencies: ModuleDependencies? = null
     private var packageFragmentProviderForModuleContent: PackageFragmentProvider? = null
 
-    private val packages = storageManager.createMemoizedFunction<FqName, PackageViewDescriptor> {
+    private val packages = storageManager.createMemoizedFunction<FqName, PackageViewDescriptor>(null) {
         fqName: FqName -> LazyPackageViewDescriptorImpl(this, fqName, storageManager)
     }
 

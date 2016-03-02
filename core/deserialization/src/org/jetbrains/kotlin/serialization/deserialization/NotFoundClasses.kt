@@ -39,11 +39,11 @@ class NotFoundClasses(private val storageManager: StorageManager, private val mo
      */
     private data class ClassRequest(val classId: ClassId, val typeParametersCount: List<Int>)
 
-    private val packageFragments = storageManager.createMemoizedFunction<FqName, PackageFragmentDescriptor> { fqName ->
+    private val packageFragments = storageManager.createMemoizedFunction<FqName, PackageFragmentDescriptor>(null) { fqName ->
         EmptyPackageFragmentDescriptor(module, fqName)
     }
 
-    private val classes = storageManager.createMemoizedFunction<ClassRequest, ClassDescriptor> { request ->
+    private val classes = storageManager.createMemoizedFunction<ClassRequest, ClassDescriptor>(null) { request ->
         val (classId, typeParametersCount) = request
 
         if (classId.isLocal) {
