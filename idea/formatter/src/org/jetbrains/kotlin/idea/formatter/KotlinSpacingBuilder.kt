@@ -27,7 +27,7 @@ import com.intellij.psi.tree.TokenSet
 import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.idea.KotlinLanguage
 import org.jetbrains.kotlin.lexer.KtTokens
-import java.util.ArrayList
+import java.util.*
 
 class KotlinSpacingBuilder(val codeStyleSettings: CodeStyleSettings, val spacingBuilderUtil: KotlinSpacingBuilderUtil) {
     private val builders = ArrayList<Builder>()
@@ -42,13 +42,26 @@ class KotlinSpacingBuilder(val codeStyleSettings: CodeStyleSettings, val spacing
         }
     }
 
+    data class SpacingRule(val spacingFun: (ASTBlock, ASTBlock, ASTBlock) -> Spacing?)
+    data class SpacingCondition(val parent: IElementType? = null, val left: IElementType? = null, val right: IElementType? = null,
+                                val parentSet: TokenSet? = null, val leftSet: TokenSet? = null, val rightSet: TokenSet? = null) {
+        fun isApplicable(p: ASTBlock, l: ASTBlock, r: ASTBlock): Boolean {
+            return (parent == null || p.node!!.elementType == parent) &&
+                   (left == null || l.node!!.elementType == left) &&
+                   (right == null || r.node!!.elementType == right) &&
+                   (parentSet == null || parentSet.contains(p.node!!.elementType)) &&
+                   (leftSet == null || leftSet.contains(l.node!!.elementType)) &&
+                   (rightSet == null || rightSet.contains(r.node!!.elementType))
+        }
+    }
+
     inner class CustomSpacingBuilder() : Builder {
-        private val rules = ArrayList<(ASTBlock, ASTBlock, ASTBlock) -> Spacing?>()
-        private var conditions = ArrayList<(ASTBlock, ASTBlock, ASTBlock) -> Boolean>()
+        private val rules = ArrayList<SpacingRule>()
+        private var conditions = ArrayList<SpacingCondition>()
 
         override fun getSpacing(parent: ASTBlock, left: ASTBlock, right: ASTBlock): Spacing? {
             for (rule in rules) {
-                val spacing = rule(parent, left, right)
+                val spacing = rule.spacingFun(parent, left, right)
                 if (spacing != null) {
                     return spacing
                 }
@@ -58,15 +71,7 @@ class KotlinSpacingBuilder(val codeStyleSettings: CodeStyleSettings, val spacing
 
         fun inPosition(parent: IElementType? = null, left: IElementType? = null, right: IElementType? = null,
                        parentSet: TokenSet? = null, leftSet: TokenSet? = null, rightSet: TokenSet? = null): CustomSpacingBuilder {
-            conditions.add {
-                p, l, r ->
-                (parent == null || p.node!!.elementType == parent) &&
-                (left == null || l.node!!.elementType == left) &&
-                (right == null || r.node!!.elementType == right) &&
-                (parentSet == null || parentSet.contains(p.node!!.elementType)) &&
-                (leftSet == null || leftSet.contains(l.node!!.elementType)) &&
-                (rightSet == null || rightSet.contains(r.node!!.elementType))
-            }
+            conditions.add(SpacingCondition(parent, left, right, parentSet, leftSet, rightSet))
             return this
         }
 
@@ -102,7 +107,8 @@ class KotlinSpacingBuilder(val codeStyleSettings: CodeStyleSettings, val spacing
 
         private fun newRule(rule: (ASTBlock, ASTBlock, ASTBlock) -> Spacing?) {
             val savedConditions = ArrayList(conditions)
-            rules.add { p, l, r -> if (savedConditions.all { it(p, l, r) }) rule(p, l, r) else null }
+            val spacingRule = SpacingRule { p, l, r -> if (savedConditions.all { it.isApplicable(p, l, r) }) rule(p, l, r) else null }
+            rules.add(spacingRule)
             conditions.clear()
         }
     }
