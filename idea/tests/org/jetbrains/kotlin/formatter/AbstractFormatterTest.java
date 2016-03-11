@@ -30,8 +30,12 @@ import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.codeStyle.CodeStyleSettings;
 import com.intellij.testFramework.LightIdeaTestCase;
 import com.intellij.util.IncorrectOperationException;
+import kotlin.collections.CollectionsKt;
+import kotlin.jvm.functions.Function1;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.kotlin.MultiFileTestUtilKt;
+import org.jetbrains.kotlin.TestFile;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
 import org.jetbrains.kotlin.idea.test.PluginTestCaseBase;
 import org.jetbrains.kotlin.test.InTextDirectivesUtils;
@@ -40,6 +44,7 @@ import org.jetbrains.kotlin.test.SettingsConfigurator;
 
 import java.io.File;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 // Based on from com.intellij.psi.formatter.java.AbstractJavaFormatterTest
@@ -78,6 +83,34 @@ public abstract class AbstractFormatterTest extends LightIdeaTestCase {
     protected void setUp() throws Exception {
         super.setUp();
         LanguageLevelProjectExtension.getInstance(getProject()).setLanguageLevel(LanguageLevel.HIGHEST);
+    }
+
+    protected void doMultiFileTest(String file) throws Exception {
+        String multiFileText = FileUtil.loadFile(new File(file), true);
+
+        List<TestFile> files = MultiFileTestUtilKt.createTestFiles(multiFileText);
+
+        final TestFile afterFile = CollectionsKt.firstOrNull(files, new Function1<TestFile, Boolean>() {
+            @Override
+            public Boolean invoke(TestFile file) {
+                return file.getName().contains(".after.kt");
+            }
+        });
+        final TestFile afterInvFile = CollectionsKt.firstOrNull(files, new Function1<TestFile, Boolean>() {
+            @Override
+            public Boolean invoke(TestFile file) {
+                return file.getName().contains(".after.inv.kt");
+            }
+        });
+        final TestFile beforeFile = CollectionsKt.firstOrNull(files, new Function1<TestFile, Boolean>() {
+            @Override
+            public Boolean invoke(TestFile file) {
+                return file.getName().contains(".before");
+            }
+        });
+
+        assert beforeFile != null;
+        assert afterFile != null || afterInvFile != null;
     }
 
     public void doTextTest(@NonNls String text, File fileAfter, String extension) throws IncorrectOperationException {

@@ -41,8 +41,9 @@ import kotlin.collections.ArraysKt;
 import kotlin.collections.CollectionsKt;
 import kotlin.jvm.functions.Function1;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.kotlin.idea.KotlinDaemonAnalyzerTestCase;
+import org.jetbrains.kotlin.TestFile;
 import org.jetbrains.kotlin.idea.KotlinFileType;
+import org.jetbrains.kotlin.idea.KotlinDaemonAnalyzerTestCase;
 import org.jetbrains.kotlin.idea.quickfix.utils.QuickfixTestUtilsKt;
 import org.jetbrains.kotlin.idea.test.ConfigLibraryUtil;
 import org.jetbrains.kotlin.idea.test.DirectiveBasedActionUtils;
@@ -148,13 +149,13 @@ public abstract class AbstractQuickFixMultiFileTest extends KotlinDaemonAnalyzer
         final TestFile afterFile = CollectionsKt.firstOrNull(subFiles, new Function1<TestFile, Boolean>() {
             @Override
             public Boolean invoke(TestFile file) {
-                return file.name.contains(".after");
+                return file.getName().contains(".after");
             }
         });
         final TestFile beforeFile = CollectionsKt.firstOrNull(subFiles, new Function1<TestFile, Boolean>() {
             @Override
             public Boolean invoke(TestFile file) {
-                return file.name.contains(".before");
+                return file.getName().contains(".before");
             }
         });
 
@@ -165,10 +166,10 @@ public abstract class AbstractQuickFixMultiFileTest extends KotlinDaemonAnalyzer
         subFiles.remove(beforeFile);
 
         for (TestFile file : subFiles) {
-            configureByText(KotlinFileType.INSTANCE, file.content);
+            configureByText(KotlinFileType.INSTANCE, file.getContent());
         }
 
-        configureByText(KotlinFileType.INSTANCE, beforeFile.content);
+        configureByText(KotlinFileType.INSTANCE, beforeFile.getContent());
 
         CommandProcessor.getInstance().executeCommand(getProject(), new Runnable() {
             @Override
@@ -176,7 +177,7 @@ public abstract class AbstractQuickFixMultiFileTest extends KotlinDaemonAnalyzer
                 try {
                     PsiFile psiFile = getFile();
 
-                    Pair<String, Boolean> pair = LightQuickFixTestCase.parseActionHint(psiFile, beforeFile.content);
+                    Pair<String, Boolean> pair = LightQuickFixTestCase.parseActionHint(psiFile, beforeFile.getContent());
                     String text = pair.getFirst();
 
                     boolean actionShouldBeAvailable = pair.getSecond();
@@ -190,13 +191,13 @@ public abstract class AbstractQuickFixMultiFileTest extends KotlinDaemonAnalyzer
                     String actualText = getFile().getText();
                     String afterText = new StringBuilder(actualText).insert(getEditor().getCaretModel().getOffset(), "<caret>").toString();
 
-                    if (pair.second && !afterText.equals(afterFile.content)) {
+                    if (pair.second && !afterText.equals(afterFile.getContent())) {
                         StringBuilder actualTestFile = new StringBuilder();
-                        actualTestFile.append("// FILE: ").append(beforeFile.name).append("\n").append(beforeFile.content);
+                        actualTestFile.append("// FILE: ").append(beforeFile.getName()).append("\n").append(beforeFile.getContent());
                         for (TestFile file : subFiles) {
-                            actualTestFile.append("// FILE: ").append(file.name).append("\n").append(file.content);
+                            actualTestFile.append("// FILE: ").append(file.getName()).append("\n").append(file.getContent());
                         }
-                        actualTestFile.append("// FILE: ").append(afterFile.name).append("\n").append(afterText);
+                        actualTestFile.append("// FILE: ").append(afterFile.getName()).append("\n").append(afterText);
 
                         KotlinTestUtils.assertEqualsToFile(new File(beforeFileName), actualTestFile.toString());
                     }
@@ -382,16 +383,6 @@ public abstract class AbstractQuickFixMultiFileTest extends KotlinDaemonAnalyzer
     @NotNull
     private static String extraFileNamePrefix(@NotNull  String mainFileName) {
         return mainFileName.replace(".Main.kt", ".").replace(".Main.java", ".");
-    }
-
-    private static class TestFile {
-        public final String name;
-        public final String content;
-
-        TestFile(String name, String content) {
-            this.name = name;
-            this.content = content;
-        }
     }
 
     @NotNull
