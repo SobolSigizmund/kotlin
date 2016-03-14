@@ -26,8 +26,7 @@ import org.jetbrains.kotlin.cfg.pseudocodeTraverser.collectData
 import org.jetbrains.kotlin.cfg.pseudocodeTraverser.traverse
 import org.jetbrains.kotlin.descriptors.VariableDescriptor
 import org.jetbrains.kotlin.resolve.BindingContext
-import java.util.ArrayList
-import java.util.HashMap
+import java.util.*
 
 class PseudocodeVariableDataCollector(
         private val bindingContext: BindingContext,
@@ -77,7 +76,7 @@ class PseudocodeVariableDataCollector(
                 val descriptor = bindingContext.get(BindingContext.DECLARATION_TO_DESCRIPTOR, variableDeclarationElement)
                 if (descriptor != null) {
                     // TODO: investigate why tests fail without this eager computation here
-//                    descriptor.toString()
+                    descriptor.toString()
 
                     assert(descriptor is VariableDescriptor) {
                         "Variable descriptor should correspond to the instruction for ${instruction.element.text}.\n" +
