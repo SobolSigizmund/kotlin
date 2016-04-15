@@ -64,7 +64,7 @@ abstract class KotlinAbiVersionIndexBase<T, V : BinaryVersion>(
             body()
         }
         catch (e: Throwable) {
-            LOG.warn("Could not index ABI version for file " + inputData.file + ": " + e.message)
+            LOG.warn("Could not index ABI version for file " + inputData.file + ": " + e.message, e)
         }
     }
 }
