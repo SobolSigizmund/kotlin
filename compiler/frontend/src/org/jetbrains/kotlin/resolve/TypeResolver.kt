@@ -524,10 +524,13 @@ class TypeResolver(
         TypeProjectionImpl((it.original as TypeParameterDescriptor).defaultType)
     }
 
-    private fun resolveTypeProjections(c: TypeResolutionContext, constructor: TypeConstructor, argumentElements: List<KtTypeProjection>): List<TypeProjection> {
+    fun resolveTypeProjections(
+            c: TypeResolutionContext,
+            constructor: TypeConstructor,
+            argumentElements: List<KtTypeProjection>
+    ): List<TypeProjection> {
         return argumentElements.mapIndexed { i, argumentElement ->
-
-            val projectionKind = argumentElement.getProjectionKind()
+            val projectionKind = argumentElement.projectionKind
             ModifierCheckerCore.check(argumentElement, c.trace, null)
             if (projectionKind == KtProjectionKind.STAR) {
                 val parameters = constructor.parameters

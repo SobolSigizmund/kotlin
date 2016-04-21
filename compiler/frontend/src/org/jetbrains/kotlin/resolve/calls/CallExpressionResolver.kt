@@ -23,6 +23,7 @@ import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.diagnostics.Errors.*
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.codeFragmentUtil.suppressDiagnosticsInDebugMode
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 import org.jetbrains.kotlin.resolve.*
 import org.jetbrains.kotlin.resolve.bindingContextUtil.recordDataFlowInfo
@@ -52,10 +53,7 @@ import org.jetbrains.kotlin.types.ErrorUtils
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.TypeUtils
 import org.jetbrains.kotlin.types.TypeUtils.NO_EXPECTED_TYPE
-import org.jetbrains.kotlin.types.expressions.DataFlowAnalyzer
-import org.jetbrains.kotlin.types.expressions.ExpressionTypingContext
-import org.jetbrains.kotlin.types.expressions.ExpressionTypingServices
-import org.jetbrains.kotlin.types.expressions.KotlinTypeInfo
+import org.jetbrains.kotlin.types.expressions.*
 import org.jetbrains.kotlin.types.expressions.typeInfoFactory.createTypeInfo
 import org.jetbrains.kotlin.types.expressions.typeInfoFactory.noTypeInfo
 import javax.inject.Inject
@@ -67,7 +65,8 @@ class CallExpressionResolver(
         private val dataFlowAnalyzer: DataFlowAnalyzer,
         private val builtIns: KotlinBuiltIns,
         private val qualifiedExpressionResolver: QualifiedExpressionResolver,
-        private val symbolUsageValidator: SymbolUsageValidator
+        private val symbolUsageValidator: SymbolUsageValidator,
+        private val typeResolver: TypeResolver
 ) {
 
     private lateinit var expressionTypingServices: ExpressionTypingServices
@@ -158,8 +157,10 @@ class CallExpressionResolver(
 
         val temporaryForQualifier = TemporaryTraceAndCache.create(context, "trace to resolve as qualifier", nameExpression)
         val contextForQualifier = context.replaceTraceAndCache(temporaryForQualifier)
-        qualifiedExpressionResolver.resolveNameExpressionAsQualifierForDiagnostics(nameExpression, receiver, contextForQualifier)?.let {
-            resolveQualifierAsStandaloneExpression(it, contextForQualifier, symbolUsageValidator)
+        qualifiedExpressionResolver.resolveNameExpressionAsQualifierForDiagnostics(
+                nameExpression, receiver, contextForQualifier, typeArguments = null
+        )?.let { qualifier ->
+            resolveQualifierAsStandaloneExpression(qualifier, contextForQualifier, symbolUsageValidator)
             temporaryForQualifier.commit()
         } ?: temporaryForVariable.commit()
         return noTypeInfo(context)
@@ -261,6 +262,45 @@ class CallExpressionResolver(
         return noTypeInfo(context)
     }
 
+    fun tryResolveDoubleColonLHS(callExpression: KtExpression?, context: ExpressionTypingContext, receiver: Receiver?): Qualifier? {
+        val (expression, typeArguments) = when (callExpression) {
+            is KtSimpleNameExpression -> {
+                callExpression to emptyList<KtTypeProjection>()
+            }
+            is KtCallExpression -> {
+                if (!callExpression.isWithoutValueArguments) return null
+                val simpleName = callExpression.calleeExpression as? KtSimpleNameExpression ?: return null
+                simpleName to callExpression.typeArguments
+            }
+            else -> return null
+        }
+
+        val temporaryForDoubleColonLHS = TemporaryTraceAndCache.create(context, "trace to resolve '::' LHS", expression)
+        val contextForDoubleColonLHS = context.replaceTraceAndCache(temporaryForDoubleColonLHS)
+
+        return resolveSimpleDoubleColonLHS(expression, typeArguments, contextForDoubleColonLHS, receiver)?.apply {
+            temporaryForDoubleColonLHS.commit()
+        }
+    }
+
+    fun resolveSimpleDoubleColonLHS(
+            expression: KtSimpleNameExpression, typeArguments: List<KtTypeProjection>, context: ExpressionTypingContext, receiver: Receiver?
+    ): Qualifier? {
+        return qualifiedExpressionResolver.resolveNameExpressionAsQualifierForDiagnostics(expression, receiver, context) {
+            typeConstructor ->
+            if (typeArguments.isEmpty()) emptyList()
+            else {
+                val typeResolutionContext = TypeResolutionContext(
+                        context.scope, context.trace, /* checkBounds = */ true, /* allowBareTypes = */ false,
+                        /* isDebuggerContext = */ expression.suppressDiagnosticsInDebugMode()
+                )
+                typeResolver.resolveTypeProjections(typeResolutionContext, typeConstructor, typeArguments)
+            }
+        }?.apply {
+            resolveQualifierReferenceTarget(this, null, context, symbolUsageValidator)
+        }
+    }
+
     private fun KtQualifiedExpression.elementChain(context: ExpressionTypingContext) =
             qualifiedExpressionResolver.resolveQualifierInExpressionAndUnroll(this, context) {
                 nameExpression ->
@@ -305,8 +345,12 @@ class CallExpressionResolver(
         else /*null*/ -> noTypeInfo(context)
     }
 
-    private fun getSafeOrUnsafeSelectorTypeInfo(receiver: Receiver, element: CallExpressionElement, context: ExpressionTypingContext):
-            KotlinTypeInfo {
+    private fun getSafeOrUnsafeSelectorTypeInfo(
+            receiver: Receiver,
+            element: CallExpressionElement,
+            context: ExpressionTypingContext,
+            isDoubleColonLHS: Boolean
+    ): KotlinTypeInfo {
         var initialDataFlowInfoForArguments = context.dataFlowInfo
         val receiverDataFlowValue = (receiver as? ReceiverValue)?.let { DataFlowValueFactory.createDataFlowValue(it, context) }
         val receiverCanBeNull = receiverDataFlowValue != null &&
@@ -323,7 +367,11 @@ class CallExpressionResolver(
         }
 
         val selector = element.selector
-        var selectorTypeInfo = getUnsafeSelectorTypeInfo(receiver, element.node, selector, context, initialDataFlowInfoForArguments)
+        var selectorTypeInfo =
+                if (isDoubleColonLHS && tryResolveDoubleColonLHS(selector, context, receiver) != null)
+                    noTypeInfo(context)
+                else
+                    getUnsafeSelectorTypeInfo(receiver, element.node, selector, context, initialDataFlowInfoForArguments)
 
         if (receiver is Qualifier) {
             resolveDeferredReceiverInQualifiedExpression(receiver, selector, context)
@@ -374,17 +422,23 @@ class CallExpressionResolver(
 
      * @return qualified expression type together with data flow information
      */
-    fun getQualifiedExpressionTypeInfo(expression: KtQualifiedExpression, context: ExpressionTypingContext): KotlinTypeInfo {
+    fun getQualifiedExpressionTypeInfo(
+            expression: KtQualifiedExpression,
+            context: ExpressionTypingContext,
+            isDoubleColonLHS: Boolean
+    ): KotlinTypeInfo {
         val currentContext = context.replaceExpectedType(NO_EXPECTED_TYPE).replaceContextDependency(INDEPENDENT)
         val trace = currentContext.trace
 
         val elementChain = expression.elementChain(context)
         val firstReceiver = elementChain.first().receiver
 
-        var receiverTypeInfo = when (trace.get(BindingContext.QUALIFIER, firstReceiver)) {
-            null -> expressionTypingServices.getTypeInfo(firstReceiver, currentContext)
-            else -> KotlinTypeInfo(null, currentContext.dataFlowInfo)
-        }
+        var receiverTypeInfo =
+                if (isDoubleColonLHS && tryResolveDoubleColonLHS(firstReceiver, currentContext, receiver = null) != null)
+                    KotlinTypeInfo(null, currentContext.dataFlowInfo)
+                else if (trace.get(BindingContext.QUALIFIER, firstReceiver) == null)
+                    expressionTypingServices.getTypeInfo(firstReceiver, currentContext)
+                else KotlinTypeInfo(null, currentContext.dataFlowInfo)
 
         var resultTypeInfo = receiverTypeInfo
 
@@ -412,7 +466,7 @@ class CallExpressionResolver(
                     }
             )
 
-            val selectorTypeInfo = getSafeOrUnsafeSelectorTypeInfo(receiver, element, contextForSelector)
+            val selectorTypeInfo = getSafeOrUnsafeSelectorTypeInfo(receiver, element, contextForSelector, isDoubleColonLHS)
             // if we have only dots and not ?. move branch point further
             allUnsafe = allUnsafe && !element.safe
             if (allUnsafe) {

@@ -1,6 +1,5 @@
 // !DIAGNOSTICS: -UNUSED_EXPRESSION
 
-
 class Foo<T> {
     class Bar<X> {
         class Baz {
@@ -19,8 +18,8 @@ fun test() {
     a<Foo.Bar<String>>()
     a<Foo.Bar.Baz>()
 
-    Foo<String>.<!WRONG_NUMBER_OF_TYPE_ARGUMENTS!>Bar<!>::class
-    Foo<!TYPE_ARGUMENTS_FOR_OUTER_CLASS_WHEN_NESTED_REFERENCED!><String><!>.Bar.Baz::class
+    <!CLASS_LITERAL_LHS_NOT_A_CLASS!>Foo<String>.Bar::class<!>
+    <!CLASS_LITERAL_LHS_NOT_A_CLASS!>Foo<String>.Bar.Baz::class<!>
 
     a<Foo<String>.<!WRONG_NUMBER_OF_TYPE_ARGUMENTS!>Bar<!>>()
     a<Foo<!TYPE_ARGUMENTS_FOR_OUTER_CLASS_WHEN_NESTED_REFERENCED!><String><!>.Bar.Baz>()

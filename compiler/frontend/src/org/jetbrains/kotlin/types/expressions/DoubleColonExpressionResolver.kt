@@ -24,12 +24,10 @@ import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.diagnostics.Errors.*
 import org.jetbrains.kotlin.diagnostics.Severity
-import org.jetbrains.kotlin.psi.KtCallableReferenceExpression
-import org.jetbrains.kotlin.psi.KtClassLiteralExpression
-import org.jetbrains.kotlin.psi.KtUserType
+import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorUtils
 import org.jetbrains.kotlin.resolve.TemporaryBindingTrace
-import org.jetbrains.kotlin.resolve.TypeResolutionContext
 import org.jetbrains.kotlin.resolve.TypeResolver
 import org.jetbrains.kotlin.resolve.callableReferences.createReflectionTypeForResolvedCallableReference
 import org.jetbrains.kotlin.resolve.callableReferences.resolveCallableReferenceTarget
@@ -38,11 +36,17 @@ import org.jetbrains.kotlin.resolve.calls.CallResolver
 import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 import org.jetbrains.kotlin.resolve.calls.context.TemporaryTraceAndCache
 import org.jetbrains.kotlin.resolve.calls.util.FakeCallableDescriptorForObject
+import org.jetbrains.kotlin.resolve.scopes.receivers.ClassQualifier
+import org.jetbrains.kotlin.resolve.scopes.receivers.ClassifierQualifier
 import org.jetbrains.kotlin.types.ErrorUtils
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.KotlinTypeImpl
 import org.jetbrains.kotlin.types.TypeUtils
 import org.jetbrains.kotlin.types.expressions.typeInfoFactory.createTypeInfo
+import javax.inject.Inject
+
+// TODO: use a language level option
+val BOUND_REFERENCES_ENABLED by lazy { System.getProperty("kotlin.lang.enable.bound.references") == "true" }
 
 class DoubleColonExpressionResolver(
         val callResolver: CallResolver,
@@ -51,55 +55,148 @@ class DoubleColonExpressionResolver(
         val reflectionTypes: ReflectionTypes,
         val typeResolver: TypeResolver
 ) {
+    private lateinit var expressionTypingServices: ExpressionTypingServices
+
+    // component dependency cycle
+    @Inject
+    fun setExpressionTypingServices(expressionTypingServices: ExpressionTypingServices) {
+        this.expressionTypingServices = expressionTypingServices
+    }
+
     fun visitClassLiteralExpression(expression: KtClassLiteralExpression, c: ExpressionTypingContext): KotlinTypeInfo {
-        val type = resolveClassLiteral(expression, c)
-        if (type != null && !type.isError) {
-            return dataFlowAnalyzer.createCheckedTypeInfo(reflectionTypes.getKClassType(Annotations.EMPTY, type), c, expression)
+        if (expression.isEmptyLHS) {
+            // "::class" will maybe mean "this::class", a class of "this" instance
+            c.trace.report(UNSUPPORTED.on(expression, "Class literals with empty left hand side are not yet supported"))
+        }
+        else {
+            val result = resolveDoubleColonLHS(expression.receiverExpression!!, expression, c)
+            if (result != null) {
+                val type = result.type
+                if (!type.isError) {
+                    if (result is LhsResult.Type) { // TODO: test "Array::class" where 'Array' is a local variable of an Array type
+                        checkClassLiteralQualifier(expression, c, type, result.qualifier)
+                    }
+                    return dataFlowAnalyzer.createCheckedTypeInfo(reflectionTypes.getKClassType(Annotations.EMPTY, type), c, expression)
+                }
+            }
         }
 
         return createTypeInfo(ErrorUtils.createErrorType("Unresolved class"), c)
     }
 
-    private fun resolveClassLiteral(expression: KtClassLiteralExpression, c: ExpressionTypingContext): KotlinType? {
-        if (expression.isEmptyLHS) {
-            // "::class" will maybe mean "this::class", a class of "this" instance
-            c.trace.report(UNSUPPORTED.on(expression, "Class literals with empty left hand side are not yet supported"))
-            return null
+    // Returns true if the expression is not a call expression without value arguments (such as "A<B>") or a qualified expression
+    // which contains such call expression as one of its parts.
+    // In this case it's pointless to attempt to type check an expression on the LHS in "A<B>::class", since "A<B>" certainly means a type.
+    private fun KtExpression.canBeConsideredProperExpression(): Boolean {
+        return when (this) {
+            is KtCallExpression ->
+                !isWithoutValueArguments
+            is KtDotQualifiedExpression ->
+                receiverExpression.canBeConsideredProperExpression() &&
+                selectorExpression?.let { it.canBeConsideredProperExpression() } ?: false
+            else -> true
+        }
+    }
+
+    private sealed class LhsResult(val type: KotlinType) {
+        class Expression(
+                val typeInfo: KotlinTypeInfo
+        ) : LhsResult(typeInfo.type!!)
+
+        class Type(
+                type: KotlinType,
+                val qualifier: ClassifierQualifier<*>
+        ) : LhsResult(type)
+    }
+
+    private fun resolveDoubleColonLHS(
+            expression: KtExpression, doubleColonExpression: KtDoubleColonExpression, c: ExpressionTypingContext
+    ): LhsResult? {
+        // First, try resolving the LHS as expression, if possible
+
+        if (BOUND_REFERENCES_ENABLED && expression.canBeConsideredProperExpression() &&
+            !doubleColonExpression.hasQuestionMarks /* TODO: test this */) {
+            val traceForExpr = TemporaryTraceAndCache.create(c, "resolve '::' LHS as expression", expression)
+            val contextForExpr = c.replaceTraceAndCache(traceForExpr)
+            val typeInfo = expressionTypingServices.getTypeInfo(expression, contextForExpr)
+            val type = typeInfo.type
+            // TODO (!!!): it's wrong to only check type, should check that there's a companion qualifier
+            if (type != null && !DescriptorUtils.isCompanionObject(type.constructor.declarationDescriptor)) {
+                traceForExpr.commit()
+                return LhsResult.Expression(typeInfo)
+            }
         }
 
-        val context = TypeResolutionContext(
-                c.scope, c.trace, /* checkBounds = */ false, /* allowBareTypes = */ true, /* isDebuggerContext = */ false
+        // Then, try resolving it as type
+
+        when {
+            expression is KtSimpleNameExpression ->
+                callExpressionResolver.resolveSimpleDoubleColonLHS(expression, emptyList(), c, receiver = null)
+            expression is KtCallExpression && expression.isWithoutValueArguments && expression.calleeExpression is KtSimpleNameExpression ->
+                callExpressionResolver.resolveSimpleDoubleColonLHS(
+                        expression.calleeExpression as KtSimpleNameExpression, expression.typeArguments, c, receiver = null
+                )
+            expression is KtDotQualifiedExpression ->
+                callExpressionResolver.getQualifiedExpressionTypeInfo(expression, c, isDoubleColonLHS = true)
+        }
+
+        val qualifier = c.trace.bindingContext.get(BindingContext.QUALIFIER, expression)
+        if (qualifier !is ClassifierQualifier<*>) return null
+        val target = qualifier.descriptor
+        if (ErrorUtils.isError(target)) return null
+
+        val arguments =
+                // TODO: consider also checking bounds; see the similar code in TypeResolver
+                if (qualifier is ClassQualifier && qualifier.typeArguments?.size == target.typeConstructor.parameters.size) {
+                    qualifier.typeArguments!!
+                }
+                else target.typeConstructor.parameters.map(TypeUtils::makeStarProjection)
+
+        val type = KotlinTypeImpl.create(
+                Annotations.EMPTY, target.typeConstructor, doubleColonExpression.hasQuestionMarks, arguments,
+                (target as? ClassDescriptor)?.getMemberScope(arguments) ?: target.defaultType.memberScope
         )
-        val possiblyBareType = typeResolver.resolvePossiblyBareType(context, expression.typeReference!!)
 
-        if (!possiblyBareType.isBare && possiblyBareType.actualType.isError) {
-            return null
-        }
+        return LhsResult.Type(type, qualifier)
+    }
 
-        var reportError = false
-        val type: KotlinType
-        if (possiblyBareType.isBare) {
-            val descriptor = possiblyBareType.bareTypeConstructor.declarationDescriptor as? ClassDescriptor
-                             ?: error("Only classes can produce bare types: $possiblyBareType")
-            if (KotlinBuiltIns.isNonPrimitiveArray(descriptor)) {
-                context.trace.report(ARRAY_CLASS_LITERAL_REQUIRES_ARGUMENT.on(expression))
+    // TODO: report better diagnostics ("no type arguments expected", "type parameter is not reified", ...)
+    private fun checkClassLiteralQualifier(
+            expression: KtClassLiteralExpression,
+            c: ExpressionTypingContext,
+            type: KotlinType,
+            qualifier: ClassifierQualifier<*>
+    ) {
+        val descriptor = qualifier.descriptor
+        if (descriptor is ClassDescriptor && KotlinBuiltIns.isNonPrimitiveArray(descriptor)) {
+            if ((qualifier as? ClassQualifier)?.typeArguments?.isEmpty() ?: true) { // TODO: test kotlin<Foo>.Array
+                c.trace.report(ARRAY_CLASS_LITERAL_REQUIRES_ARGUMENT.on(expression))
+            }
+            else if (!isAllowedInClassLiteral(type)) {
+                c.trace.report(CLASS_LITERAL_LHS_NOT_A_CLASS.on(expression))
             }
 
-            type = KotlinTypeImpl.create(
-                    Annotations.EMPTY, descriptor, possiblyBareType.isNullable,
-                    descriptor.typeConstructor.parameters.map(TypeUtils::makeStarProjection)
-            )
-        }
-        else {
-            type = possiblyBareType.actualType
-            reportError = !isAllowedInClassLiteral(type)
+            return
         }
 
-        if (type.isMarkedNullable || reportError) {
-            context.trace.report(CLASS_LITERAL_LHS_NOT_A_CLASS.on(expression))
+        if (expression.hasTypeArgumentsInQualifiers() || expression.hasQuestionMarks ||
+            (descriptor is TypeParameterDescriptor && !descriptor.isReified)) {
+            c.trace.report(CLASS_LITERAL_LHS_NOT_A_CLASS.on(expression))
         }
+    }
 
-        return type
+    private fun KtClassLiteralExpression.hasTypeArgumentsInQualifiers(): Boolean {
+        var expression = receiverExpression ?: return false
+        while (true) {
+            when (expression) {
+                is KtCallExpression -> return true
+                is KtDotQualifiedExpression -> {
+                    if (expression.selectorExpression is KtCallExpression) return true
+                    expression = expression.receiverExpression
+                }
+                else -> return false
+            }
+        }
     }
 
     private fun isAllowedInClassLiteral(type: KotlinType): Boolean {
@@ -122,11 +219,8 @@ class DoubleColonExpressionResolver(
     }
 
     fun visitCallableReferenceExpression(expression: KtCallableReferenceExpression, c: ExpressionTypingContext): KotlinTypeInfo {
-        val typeReference = expression.typeReference
-
-        val receiverType = typeReference?.let { typeReference ->
-            typeResolver.resolveType(c.scope, typeReference, c.trace, false)
-        }
+        val lhsResult = expression.receiverExpression?.let { resolveDoubleColonLHS(it, expression, c) }
+        val receiverType = lhsResult?.type // TODO: handle LhsResult.Expression and LhsResult.Type
 
         val callableReference = expression.callableReference
         if (callableReference.getReferencedName().isEmpty()) {
@@ -136,7 +230,7 @@ class DoubleColonExpressionResolver(
         }
 
         val trace = TemporaryBindingTrace.create(c.trace, "Callable reference type")
-        val result = getCallableReferenceType(expression, receiverType, c.replaceBindingTrace(trace))
+        val result = getCallableReferenceType(expression, receiverType, lhsResult is LhsResult.Expression, c.replaceBindingTrace(trace))
         val hasErrors = hasErrors(trace) // Do not inline this local variable (execution order is important)
         trace.commit()
         if (!hasErrors && result != null) {
@@ -181,6 +275,7 @@ class DoubleColonExpressionResolver(
     private fun getCallableReferenceType(
             expression: KtCallableReferenceExpression,
             lhsType: KotlinType?,
+            isBound: Boolean,
             context: ExpressionTypingContext
     ): KotlinType? {
         val reference = expression.callableReference
@@ -205,6 +300,10 @@ class DoubleColonExpressionResolver(
             context.trace.report(CALLABLE_REFERENCE_TO_ANNOTATION_CONSTRUCTOR.on(reference))
         }
 
-        return createReflectionTypeForResolvedCallableReference(expression, lhsType, descriptor, context, reflectionTypes)
+        val ignoreReceiver = isBound || expression.isEmptyLHS
+        return createReflectionTypeForResolvedCallableReference(expression, lhsType, ignoreReceiver, descriptor, context, reflectionTypes)
     }
 }
+
+val KtCallExpression.isWithoutValueArguments: Boolean
+    get() = valueArgumentList == null && lambdaArguments.isEmpty() && typeArgumentList != null

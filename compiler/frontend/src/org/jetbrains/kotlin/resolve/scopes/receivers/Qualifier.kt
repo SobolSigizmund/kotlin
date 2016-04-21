@@ -16,10 +16,8 @@
 
 package org.jetbrains.kotlin.resolve.scopes.receivers
 
-import org.jetbrains.kotlin.descriptors.ClassDescriptor
-import org.jetbrains.kotlin.descriptors.ClassKind
-import org.jetbrains.kotlin.descriptors.PackageViewDescriptor
-import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
+import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtSimpleNameExpression
 import org.jetbrains.kotlin.psi.psiUtil.getTopmostParentQualifiedExpressionForSelector
@@ -27,6 +25,8 @@ import org.jetbrains.kotlin.resolve.descriptorUtil.classValueType
 import org.jetbrains.kotlin.resolve.scopes.ChainedMemberScope
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.TypeProjection
+import org.jetbrains.kotlin.types.expressions.isWithoutValueArguments
 import java.util.*
 
 interface Qualifier : QualifierReceiver {
@@ -34,7 +34,13 @@ interface Qualifier : QualifierReceiver {
 }
 
 val Qualifier.expression: KtExpression
-    get() = referenceExpression.getTopmostParentQualifiedExpressionForSelector() ?: referenceExpression
+    get() = with(referenceExpression) {
+        val parent = parent
+        // Consider the expression "A.B.C<D>" which can appear in the LHS of '::'. In this case referenceExpression is "C",
+        // its parent is the call expression "C<D>", and the topmost qualified expression is "A.B.C<D>"
+        val expression = if (parent is KtCallExpression && parent.isWithoutValueArguments) parent else this
+        return expression.getTopmostParentQualifiedExpressionForSelector() ?: expression
+    }
 
 class PackageQualifier(
         override val referenceExpression: KtSimpleNameExpression,
@@ -46,20 +52,31 @@ class PackageQualifier(
     override fun toString() = "Package{$descriptor}"
 }
 
-class TypeParameterQualifier(
+abstract class ClassifierQualifier<T : ClassifierDescriptor>(
         override val referenceExpression: KtSimpleNameExpression,
-        override val descriptor: TypeParameterDescriptor
-) : Qualifier {
+        override val descriptor: T
+) : Qualifier
+
+class TypeParameterQualifier(
+        referenceExpression: KtSimpleNameExpression,
+        descriptor: TypeParameterDescriptor
+) : ClassifierQualifier<TypeParameterDescriptor>(referenceExpression, descriptor) {
     override val classValueReceiver: ReceiverValue? get() = null
     override val staticScope: MemberScope get() = MemberScope.Empty
 
     override fun toString() = "TypeParameter{$descriptor}"
 }
 
+/**
+ * @param typeArguments type arguments provided for this qualifier, or null if no type arguments are possible in this position.
+ *                      Currently this is not null **iff** this qualifier is a part of the qualified expression on the LHS of '::',
+ *                      e.g. in "A.B.C<D>::foo" or "C<D>::foo", typeArguments for the qualifier on the reference "C" would be ["D"].
+ */
 class ClassQualifier(
-        override val referenceExpression: KtSimpleNameExpression,
-        override val descriptor: ClassDescriptor
-) : Qualifier {
+        referenceExpression: KtSimpleNameExpression,
+        descriptor: ClassDescriptor,
+        val typeArguments: List<TypeProjection>?
+) : ClassifierQualifier<ClassDescriptor>(referenceExpression, descriptor) {
     override val classValueReceiver: ClassValueReceiver? = descriptor.classValueType?.let {
         ClassValueReceiver(this, it)
     }

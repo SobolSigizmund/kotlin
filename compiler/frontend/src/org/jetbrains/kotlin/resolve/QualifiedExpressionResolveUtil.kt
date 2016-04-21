@@ -64,7 +64,7 @@ fun resolveQualifierAsStandaloneExpression(
     return referenceTarget
 }
 
-private fun resolveQualifierReferenceTarget(
+fun resolveQualifierReferenceTarget(
         qualifier: Qualifier,
         selector: DeclarationDescriptor?,
         context: ExpressionTypingContext,

@@ -657,7 +657,7 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
     @Override
     public KotlinTypeInfo visitQualifiedExpression(@NotNull KtQualifiedExpression expression, ExpressionTypingContext context) {
         CallExpressionResolver callExpressionResolver = components.callExpressionResolver;
-        return callExpressionResolver.getQualifiedExpressionTypeInfo(expression, context);
+        return callExpressionResolver.getQualifiedExpressionTypeInfo(expression, context, /* isDoubleColonLHS = */ false);
     }
 
     @Override

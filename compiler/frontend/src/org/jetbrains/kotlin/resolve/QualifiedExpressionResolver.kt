@@ -35,6 +35,8 @@ import org.jetbrains.kotlin.resolve.scopes.utils.findClassifier
 import org.jetbrains.kotlin.resolve.scopes.utils.memberScopeAsImportingScope
 import org.jetbrains.kotlin.resolve.source.KotlinSourceElement
 import org.jetbrains.kotlin.resolve.validation.SymbolUsageValidator
+import org.jetbrains.kotlin.types.TypeConstructor
+import org.jetbrains.kotlin.types.TypeProjection
 import org.jetbrains.kotlin.types.expressions.ExpressionTypingContext
 import org.jetbrains.kotlin.utils.addIfNotNull
 import org.jetbrains.kotlin.utils.addToStdlib.check
@@ -407,7 +409,8 @@ class QualifiedExpressionResolver(val symbolUsageValidator: SymbolUsageValidator
     fun resolveNameExpressionAsQualifierForDiagnostics(
             expression: KtSimpleNameExpression,
             receiver: Receiver?,
-            context: ExpressionTypingContext
+            context: ExpressionTypingContext,
+            typeArguments: ((TypeConstructor) -> List<TypeProjection>)?
     ): Qualifier? {
         val name = expression.getReferencedNameAsName()
 
@@ -426,7 +429,8 @@ class QualifiedExpressionResolver(val symbolUsageValidator: SymbolUsageValidator
         }
 
         if (qualifierDescriptor != null) {
-            return storeResult(context.trace, expression, qualifierDescriptor, context.scope.ownerDescriptor, QualifierPosition.EXPRESSION)
+            return storeResult(context.trace, expression, qualifierDescriptor, context.scope.ownerDescriptor, QualifierPosition.EXPRESSION,
+                               typeArguments = typeArguments)
         }
 
         return null
@@ -554,10 +558,12 @@ class QualifiedExpressionResolver(val symbolUsageValidator: SymbolUsageValidator
             descriptor: DeclarationDescriptor?,
             shouldBeVisibleFrom: DeclarationDescriptor?,
             position: QualifierPosition,
-            isQualifier: Boolean = true
+            isQualifier: Boolean = true,
+            typeArguments: ((TypeConstructor) -> List<TypeProjection>)? = null
     ): Qualifier? {
         if (descriptor == null) {
             trace.report(Errors.UNRESOLVED_REFERENCE.on(referenceExpression, referenceExpression))
+            // TODO: resolve type arguments nevertheless (Error<Arg>::foo)
             return null
         }
 
@@ -580,15 +586,28 @@ class QualifiedExpressionResolver(val symbolUsageValidator: SymbolUsageValidator
             }
         }
 
-        return if (isQualifier) storeQualifier(trace, referenceExpression, descriptor) else null
+        return if (isQualifier) storeQualifier(trace, referenceExpression, descriptor, typeArguments) else null
     }
 
-    private fun storeQualifier(trace: BindingTrace, referenceExpression: KtSimpleNameExpression, descriptor: DeclarationDescriptor): Qualifier? {
+    private fun storeQualifier(
+            trace: BindingTrace,
+            referenceExpression: KtSimpleNameExpression,
+            descriptor: DeclarationDescriptor,
+            typeArguments: ((TypeConstructor) -> List<TypeProjection>)?
+    ): Qualifier? {
         val qualifier =
                 when (descriptor) {
-                    is PackageViewDescriptor -> PackageQualifier(referenceExpression, descriptor)
-                    is ClassDescriptor -> ClassQualifier(referenceExpression, descriptor)
-                    is TypeParameterDescriptor -> TypeParameterQualifier(referenceExpression, descriptor)
+                    is PackageViewDescriptor -> {
+                        // TODO: resolve type arguments and report "not allowed on package" (pkg<Arg>::foo)
+                        PackageQualifier(referenceExpression, descriptor)
+                    }
+                    is ClassDescriptor -> {
+                        ClassQualifier(referenceExpression, descriptor, typeArguments?.invoke(descriptor.typeConstructor))
+                    }
+                    is TypeParameterDescriptor -> {
+                        // TODO: resolve type arguments and report "not allowed on type parameter" (T<Arg>::foo)
+                        TypeParameterQualifier(referenceExpression, descriptor)
+                    }
                     else -> return null
                 }
 

@@ -22,6 +22,18 @@ import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.lexer.KtTokens
 
 abstract class KtDoubleColonExpression(node: ASTNode) : KtExpressionImpl(node) {
+    val receiverExpression: KtExpression?
+        get() {
+            var node = doubleColonTokenReference.prevSibling
+            while (node != null && (node as? ASTNode)?.elementType == KtTokens.QUEST) {
+                node = node.prevSibling
+            }
+            return node as KtExpression?
+        }
+
+    val hasQuestionMarks: Boolean
+        get() = (doubleColonTokenReference.prevSibling as? ASTNode)?.elementType == KtTokens.QUEST
+
     val typeReference: KtTypeReference?
         get() = findChildByType(KtNodeTypes.TYPE_REFERENCE)
 
