@@ -172,7 +172,7 @@ class CallExpressionResolver(
         val typeInfo = getCallExpressionTypeInfoWithoutFinalTypeCheck(
                 callExpression, receiver, callOperationNode, context, context.dataFlowInfo)
         if (context.contextDependency == INDEPENDENT) {
-            dataFlowAnalyzer.checkType(typeInfo.type, callExpression, context)
+            //dataFlowAnalyzer.checkType(typeInfo.type, callExpression, context)
         }
         return typeInfo
     }
@@ -351,7 +351,7 @@ class CallExpressionResolver(
         }
         else {
             if (context.contextDependency == INDEPENDENT) {
-                dataFlowAnalyzer.checkType(selectorTypeInfo.type, qualified, context)
+                //dataFlowAnalyzer.checkType(selectorTypeInfo.type, qualified, context)
             }
             selectorTypeInfo
         }

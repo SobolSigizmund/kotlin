@@ -158,6 +158,7 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
         CallExpressionResolver callExpressionResolver = components.callExpressionResolver;
         KotlinTypeInfo typeInfo = callExpressionResolver.getSimpleNameExpressionTypeInfo(expression, null, null, context);
         checkNull(expression, context, typeInfo.getType());
+        if (context.contextDependency == DEPENDENT) return typeInfo;
 
         return components.dataFlowAnalyzer.checkType(typeInfo, expression, context); // TODO : Extensions to this
     }
@@ -657,13 +658,19 @@ public class BasicExpressionTypingVisitor extends ExpressionTypingVisitor {
     @Override
     public KotlinTypeInfo visitQualifiedExpression(@NotNull KtQualifiedExpression expression, ExpressionTypingContext context) {
         CallExpressionResolver callExpressionResolver = components.callExpressionResolver;
-        return callExpressionResolver.getQualifiedExpressionTypeInfo(expression, context);
+        KotlinTypeInfo typeInfo = callExpressionResolver.getQualifiedExpressionTypeInfo(expression, context);
+        if (context.contextDependency == DEPENDENT) return typeInfo;
+
+        return components.dataFlowAnalyzer.checkType(typeInfo, expression, context);
     }
 
     @Override
     public KotlinTypeInfo visitCallExpression(@NotNull KtCallExpression expression, ExpressionTypingContext context) {
         CallExpressionResolver callExpressionResolver = components.callExpressionResolver;
-        return callExpressionResolver.getCallExpressionTypeInfo(expression, null, null, context);
+        KotlinTypeInfo typeInfo = callExpressionResolver.getCallExpressionTypeInfo(expression, null, null, context);
+        if (context.contextDependency == DEPENDENT) return typeInfo;
+
+        return components.dataFlowAnalyzer.checkType(typeInfo, expression, context);
     }
 
     @Override
