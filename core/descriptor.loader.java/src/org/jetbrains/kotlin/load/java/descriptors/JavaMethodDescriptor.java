@@ -114,12 +114,12 @@ public class JavaMethodDescriptor extends SimpleFunctionDescriptorImpl implement
             @Nullable FunctionDescriptor original,
             @NotNull Kind kind,
             @Nullable Name newName,
-            boolean preserveSource
+            @NotNull Annotations annotations, boolean preserveSource
     ) {
         JavaMethodDescriptor result = new JavaMethodDescriptor(
                 newOwner,
                 (SimpleFunctionDescriptor) original,
-                getAnnotations(),
+                annotations,
                 newName != null ? newName : getName(),
                 kind,
                 getSourceToUseForCopy(preserveSource, original)

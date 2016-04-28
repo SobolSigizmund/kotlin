@@ -21,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.descriptors.*;
 import org.jetbrains.kotlin.descriptors.annotations.Annotations;
+import org.jetbrains.kotlin.descriptors.annotations.AnnotationsKt;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.resolve.DescriptorFactory;
 import org.jetbrains.kotlin.types.*;
@@ -447,6 +448,13 @@ public abstract class FunctionDescriptorImpl extends DeclarationDescriptorNonRoo
 
         @NotNull
         @Override
+        public CopyConfiguration setAdditionalAnnotations(@NotNull Annotations additionalAnnotations) {
+            this.additionalAnnotations = additionalAnnotations;
+            return this;
+        }
+
+        @NotNull
+        @Override
         public CopyConfiguration setSubstitution(@NotNull TypeSubstitution substitution) {
             this.substitution = substitution;
             return this;
@@ -485,8 +493,13 @@ public abstract class FunctionDescriptorImpl extends DeclarationDescriptorNonRoo
 
     @Nullable
     protected FunctionDescriptor doSubstitute(@NotNull CopyConfiguration configuration) {
+        Annotations resultAnnotation =
+                configuration.additionalAnnotations != null
+                ? AnnotationsKt.composeAnnotations(getAnnotations(), configuration.additionalAnnotations)
+                : getAnnotations();
+
         FunctionDescriptorImpl substitutedDescriptor = createSubstitutedCopy(
-                configuration.newOwner, configuration.original, configuration.kind, configuration.name,
+                configuration.newOwner, configuration.original, configuration.kind, configuration.name, resultAnnotation,
                 configuration.preserveSourceElement);
 
         List<TypeParameterDescriptor> substitutedTypeParameters;
@@ -600,7 +613,7 @@ public abstract class FunctionDescriptorImpl extends DeclarationDescriptorNonRoo
             @Nullable FunctionDescriptor original,
             @NotNull Kind kind,
             @Nullable Name newName,
-            boolean preserveSource
+            @NotNull Annotations annotations, boolean preserveSource
     );
 
     @NotNull

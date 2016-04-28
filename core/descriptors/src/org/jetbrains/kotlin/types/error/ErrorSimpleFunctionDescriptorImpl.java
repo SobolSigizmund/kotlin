@@ -164,6 +164,12 @@ public class ErrorSimpleFunctionDescriptorImpl extends SimpleFunctionDescriptorI
                 return this;
             }
 
+            @NotNull
+            @Override
+            public CopyBuilder<SimpleFunctionDescriptor> setAdditionalAnnotations(@NotNull Annotations additionalAnnotations) {
+                return this;
+            }
+
             @Nullable
             @Override
             public SimpleFunctionDescriptor build() {
