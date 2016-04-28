@@ -47,7 +47,7 @@ public class ErrorSimpleFunctionDescriptorImpl extends SimpleFunctionDescriptorI
             @Nullable FunctionDescriptor original,
             @NotNull Kind kind,
             @Nullable Name newName,
-            boolean preserveSource
+            @NotNull Annotations annotations, boolean preserveSource
     ) {
         return this;
     }
@@ -161,6 +161,12 @@ public class ErrorSimpleFunctionDescriptorImpl extends SimpleFunctionDescriptorI
             @NotNull
             @Override
             public CopyBuilder<SimpleFunctionDescriptor> setHiddenToOvercomeSignatureClash() {
+                return this;
+            }
+
+            @NotNull
+            @Override
+            public CopyBuilder<SimpleFunctionDescriptor> setHiddenForResolutionEverywhereBesideSupercalls() {
                 return this;
             }
 
