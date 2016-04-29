@@ -1,3 +1,4 @@
+// SKIP_TXT
 import A.ONE
 
 enum class A {
