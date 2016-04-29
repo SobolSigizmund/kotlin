@@ -1,3 +1,4 @@
+// SKIP_TXT
 import Kind.EXT_RETURN
 import Kind.GLOBAL_RETURN
 

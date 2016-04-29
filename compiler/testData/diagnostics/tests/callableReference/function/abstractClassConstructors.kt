@@ -1,4 +1,5 @@
 // !DIAGNOSTICS: -UNUSED_EXPRESSION
+// SKIP_TXT
 interface A
 abstract class B
 annotation class C

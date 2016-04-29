@@ -1,3 +1,4 @@
+// SKIP_TXT
 <!REDUNDANT_MODIFIER_FOR_TARGET!>open<!> interface First
 
 <!REDUNDANT_MODIFIER_FOR_TARGET!>abstract<!> interface Second

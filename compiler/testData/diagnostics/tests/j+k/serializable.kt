@@ -1,3 +1,4 @@
+// SKIP_TXT
 // FILE: B.kt
 
 import aa.A.use

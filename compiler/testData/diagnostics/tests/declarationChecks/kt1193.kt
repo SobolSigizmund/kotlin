@@ -1,4 +1,5 @@
 // !DIAGNOSTICS: -UNUSED_PARAMETER
+// SKIP_TXT
 //KT-1193 Check enum entry supertype / initialization
 
 package kt1193

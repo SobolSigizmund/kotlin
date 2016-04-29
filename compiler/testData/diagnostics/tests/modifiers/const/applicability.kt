@@ -1,4 +1,5 @@
 // !DIAGNOSTICS:-UNUSED_VARIABLE,-CAST_NEVER_SUCCEEDS
+// SKIP_TXT
 
 import kotlin.reflect.KProperty
 

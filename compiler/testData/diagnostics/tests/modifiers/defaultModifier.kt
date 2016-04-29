@@ -1,3 +1,4 @@
+// SKIP_TXT
 <!WRONG_MODIFIER_TARGET!>companion<!> class A {
     companion object {
 

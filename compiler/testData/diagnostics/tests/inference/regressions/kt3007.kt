@@ -1,3 +1,4 @@
+// SKIP_TXT
 //KT-3007 Kotlin plugin 0.4.126 does not compile KAnnotator revision ba0a93eb
 package a
 

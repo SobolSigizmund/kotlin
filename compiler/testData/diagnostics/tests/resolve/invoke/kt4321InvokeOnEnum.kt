@@ -1,3 +1,4 @@
+// SKIP_TXT
 //KT-4321 invoke() on enum doesn't work
 
 import DOMElementTestClasses.cls2

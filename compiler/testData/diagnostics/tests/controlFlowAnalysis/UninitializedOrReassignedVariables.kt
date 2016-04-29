@@ -1,3 +1,4 @@
+// SKIP_TXT
 package uninitialized_reassigned_variables
 
 fun doSmth(<!UNUSED_PARAMETER!>s<!>: String) {}

@@ -1,3 +1,4 @@
+// SKIP_TXT
 class A {
     inner class B {
         <!NESTED_CLASS_NOT_ALLOWED!>class C<!>

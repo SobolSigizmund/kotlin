@@ -1,4 +1,5 @@
 // !DIAGNOSTICS: -MANY_COMPANION_OBJECTS -REDECLARATION -DUPLICATE_CLASS_NAMES
+// SKIP_TXT
 
 // KT-3464 Front-end shouldn't allow override modifier in class declaration
 

@@ -1,3 +1,4 @@
+// SKIP_TXT
 //FILE: foo.kt
 fun main(args: Array<String>) {
     val c: Type

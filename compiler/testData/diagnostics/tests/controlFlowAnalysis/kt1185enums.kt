@@ -1,3 +1,4 @@
+// SKIP_TXT
 //KT-1185 Support full enumeration check for 'when'
 
 package kt1185

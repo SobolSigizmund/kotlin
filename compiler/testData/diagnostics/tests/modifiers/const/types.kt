@@ -1,4 +1,5 @@
 // !DIAGNOSTICS: -UNUSED_PARAMETER
+// SKIP_TXT
 
 const val intConst = 1
 const val longConst: Long = 1

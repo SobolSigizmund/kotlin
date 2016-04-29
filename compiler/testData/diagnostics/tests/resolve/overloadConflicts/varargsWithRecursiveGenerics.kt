@@ -1,4 +1,5 @@
 // !DIAGNOSTICS: -UNUSED_PARAMETER
+// SKIP_TXT
 // FILE: J.java
 import java.util.*
 

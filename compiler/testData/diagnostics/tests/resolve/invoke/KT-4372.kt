@@ -1,4 +1,5 @@
 // !DIAGNOSTICS: -UNUSED_PARAMETER
+// SKIP_TXT
 
 //KT-4372 Invalid error position and failing to resolve invoke with receiver from other module
 

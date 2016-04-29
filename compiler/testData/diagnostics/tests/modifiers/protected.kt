@@ -1,3 +1,4 @@
+// SKIP_TXT
 class My(protected val x: Int) {
     class Her(protected val x: Int)
 

@@ -1,3 +1,4 @@
+// SKIP_TXT
 object A {
     <!CONSTRUCTOR_IN_OBJECT!>constructor()<!>
     init {}

@@ -1,4 +1,5 @@
 // !DIAGNOSTICS: -UNUSED_PARAMETER
+// SKIP_TXT
 enum class A {
     W(1), X(1, 2), Y(3.0), Z(""), E();
 

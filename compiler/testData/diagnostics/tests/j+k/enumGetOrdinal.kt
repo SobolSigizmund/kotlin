@@ -1,3 +1,4 @@
+// SKIP_TXT
 // FILE: MyEnum.java
 
 public enum MyEnum {

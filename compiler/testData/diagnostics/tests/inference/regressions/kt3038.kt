@@ -1,3 +1,4 @@
+// SKIP_TXT
 //KT-3038 Wrong type inference for enum entry
 package a
 

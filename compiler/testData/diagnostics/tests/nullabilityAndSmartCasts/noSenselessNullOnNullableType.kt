@@ -1,3 +1,4 @@
+// SKIP_TXT
 // FILE: A.java
 
 class A {

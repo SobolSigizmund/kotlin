@@ -1,3 +1,4 @@
+// SKIP_TXT
 interface N { fun foo() = 1 }
 
 class WithClassObject {

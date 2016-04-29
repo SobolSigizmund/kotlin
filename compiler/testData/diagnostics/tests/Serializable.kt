@@ -1,3 +1,4 @@
+// SKIP_TXT
 fun use(<!UNUSED_PARAMETER!>s<!>: java.io.Serializable) {
 
 }

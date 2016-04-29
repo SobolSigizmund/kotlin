@@ -1,3 +1,4 @@
+// SKIP_TXT
 package a
 
 import a.A.*

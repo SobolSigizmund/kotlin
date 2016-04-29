@@ -1,3 +1,4 @@
+// SKIP_TXT
 class A {
     enum class E {
         E1,

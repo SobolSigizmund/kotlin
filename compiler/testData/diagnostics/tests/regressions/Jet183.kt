@@ -1,3 +1,4 @@
+// SKIP_TXT
 enum class ProtocolState {
   WAITING {
     override fun signal() = ProtocolState.TALKING

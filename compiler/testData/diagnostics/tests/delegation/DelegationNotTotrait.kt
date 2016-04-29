@@ -1,3 +1,4 @@
+// SKIP_TXT
 open class Foo() {
 
 }
