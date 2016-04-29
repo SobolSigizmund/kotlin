@@ -1,3 +1,4 @@
+// SKIP_TXT
 @Target(AnnotationTarget.LOCAL_VARIABLE) annotation class base
 
 <!WRONG_ANNOTATION_TARGET!>@base<!> annotation class derived

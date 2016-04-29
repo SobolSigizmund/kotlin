@@ -1,3 +1,4 @@
+// SKIP_TXT
 @Target(AnnotationTarget.ANNOTATION_CLASS) annotation class base
 
 @base annotation class derived

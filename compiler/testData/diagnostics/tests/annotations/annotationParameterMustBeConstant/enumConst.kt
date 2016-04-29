@@ -1,3 +1,4 @@
+// SKIP_TXT
 annotation class AnnE(val i: MyEnum)
 
 @AnnE(<!ANNOTATION_PARAMETER_MUST_BE_ENUM_CONST!>e<!>)

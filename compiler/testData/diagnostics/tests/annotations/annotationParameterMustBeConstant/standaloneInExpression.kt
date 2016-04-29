@@ -1,3 +1,4 @@
+// SKIP_TXT
 annotation class AnnE(val i: String)
 
 enum class MyEnum {

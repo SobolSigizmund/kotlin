@@ -1,3 +1,4 @@
+// SKIP_TXT
 @Target(AnnotationTarget.FIELD) 
 annotation class Field
 

@@ -1,4 +1,5 @@
 // !DIAGNOSTICS: -UNUSED_PARAMETER
+// SKIP_TXT
 @Target(AnnotationTarget.CLASS) annotation class base
 
 @base annotation class derived

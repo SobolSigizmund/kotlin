@@ -1,4 +1,5 @@
 // !DIAGNOSTICS: -UNUSED_PARAMETER
+// SKIP_TXT
 @Target() annotation class empty
 
 <!WRONG_ANNOTATION_TARGET!>@empty<!> annotation class derived

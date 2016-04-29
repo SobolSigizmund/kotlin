@@ -1,3 +1,4 @@
+// SKIP_TXT
 package test
 
 import java.lang.annotation.RetentionPolicy
