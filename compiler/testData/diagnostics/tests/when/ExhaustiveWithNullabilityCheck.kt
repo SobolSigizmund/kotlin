@@ -1,3 +1,4 @@
+// SKIP_TXT
 // KT-7857: when exhaustiveness does not take previous nullability checks into account
 enum class X { A, B }
 fun foo(arg: X?): Int {

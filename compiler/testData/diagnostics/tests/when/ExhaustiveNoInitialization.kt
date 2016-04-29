@@ -1,3 +1,4 @@
+// SKIP_TXT
 fun foo(b: Boolean): Int {
     val x: Int
     val y: Int

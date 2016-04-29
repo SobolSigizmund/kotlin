@@ -1,3 +1,4 @@
+// SKIP_TXT
 enum class Color { RED, GREEN, BLUE }
 
 fun foo(arr: Array<Color>): Color {

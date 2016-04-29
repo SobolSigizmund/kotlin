@@ -1,3 +1,4 @@
+// SKIP_TXT
 val test1: (String) -> Boolean =
         when {
             true -> {{ true }}

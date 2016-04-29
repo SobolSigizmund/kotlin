@@ -1,3 +1,4 @@
+// SKIP_TXT
 // EA-68871: empty when condition
 fun foo(arg: Int): Int {
     when (arg) {

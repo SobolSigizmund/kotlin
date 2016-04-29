@@ -1,3 +1,4 @@
+// SKIP_TXT
 interface Maybe<T>
 class Some<T>(val value: T) : Maybe<T>
 class None<T> : Maybe<T>

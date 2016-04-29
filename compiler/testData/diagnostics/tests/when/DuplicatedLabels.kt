@@ -1,3 +1,4 @@
+// SKIP_TXT
 package test
 
 const val four = 4

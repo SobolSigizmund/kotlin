@@ -1,3 +1,4 @@
+// SKIP_TXT
 // KT-2902 Check for null should be required when match nullable enum element
 
 // FILE: 1.kt

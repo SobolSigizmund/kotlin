@@ -1,3 +1,4 @@
+// SKIP_TXT
 fun test1(): Int {
     val x: String = if (true) {
         when {

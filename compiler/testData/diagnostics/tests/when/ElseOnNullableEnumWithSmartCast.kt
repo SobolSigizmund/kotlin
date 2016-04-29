@@ -1,3 +1,4 @@
+// SKIP_TXT
 enum class E { A, B }
 
 fun foo(e: E, something: Any?): Int {

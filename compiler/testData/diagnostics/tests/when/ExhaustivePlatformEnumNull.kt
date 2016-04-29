@@ -1,3 +1,4 @@
+// SKIP_TXT
 // See KT-6399: exhaustive whens on platform enums
 
 // FILE: J.java

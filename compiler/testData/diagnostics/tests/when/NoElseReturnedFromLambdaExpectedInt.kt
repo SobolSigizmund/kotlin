@@ -1,3 +1,4 @@
+// SKIP_TXT
 fun foo(x: Int) {
     r {
         <!NO_ELSE_IN_WHEN!>when<!> (x) {

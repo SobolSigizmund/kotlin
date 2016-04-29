@@ -1,3 +1,4 @@
+// SKIP_TXT
 fun foo(a: Int) {
     @ann
     when (a) {

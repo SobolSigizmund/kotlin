@@ -1,3 +1,4 @@
+// SKIP_TXT
 fun foo(x: Int, y: Int): Int =
         when {
             x > 0<!COMMA_IN_WHEN_CONDITION_WITHOUT_ARGUMENT!>,<!> y > 0<!COMMA_IN_WHEN_CONDITION_WITHOUT_ARGUMENT!>,<!><!SYNTAX!>,<!> x < 0 -> 1

@@ -1,3 +1,4 @@
+// SKIP_TXT
 enum class Direction {
     NORTH, SOUTH, WEST, EAST
 }

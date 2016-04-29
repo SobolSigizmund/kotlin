@@ -1,3 +1,4 @@
+// SKIP_TXT
 fun Int.foo() : Boolean = true
 
 fun foo() : Int {

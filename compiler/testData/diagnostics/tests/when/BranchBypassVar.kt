@@ -1,3 +1,4 @@
+// SKIP_TXT
 class A
 
 fun test(a: Any) {

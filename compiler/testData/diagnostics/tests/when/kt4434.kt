@@ -1,3 +1,4 @@
+// SKIP_TXT
 // KT-4434 Missed diagnostic about else branch in when
 
 package test

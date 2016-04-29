@@ -1,3 +1,4 @@
+// SKIP_TXT
 fun foo(a: Boolean, b: Boolean): Int {
     var x: Int
     if (a) {

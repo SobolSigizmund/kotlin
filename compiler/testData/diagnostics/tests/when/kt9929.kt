@@ -1,3 +1,4 @@
+// SKIP_TXT
 val test: Int = if (true) {
     when (2) {
         1 -> 1

@@ -1,4 +1,5 @@
 // !DIAGNOSTICS: -UNUSED_PARAMETER -DEBUG_INFO_SMARTCAST
+// SKIP_TXT
 
 interface Data
 interface Item

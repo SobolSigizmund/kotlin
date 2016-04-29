@@ -1,3 +1,4 @@
+// SKIP_TXT
 // See KT-5113
 enum class E {
     A,

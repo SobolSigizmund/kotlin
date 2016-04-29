@@ -1,3 +1,4 @@
+// SKIP_TXT
 enum class My { A, B }
 
 fun test(a: My): String {

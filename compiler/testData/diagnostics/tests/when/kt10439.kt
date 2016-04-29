@@ -1,3 +1,4 @@
+// SKIP_TXT
 fun foo(x: Int) = x
 
 fun test0(flag: Boolean) {
