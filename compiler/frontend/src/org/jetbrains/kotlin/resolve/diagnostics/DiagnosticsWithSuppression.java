@@ -52,6 +52,7 @@ public class DiagnosticsWithSuppression implements Diagnostics {
         return new FilteringIterator<Diagnostic, Diagnostic>(diagnostics.iterator(), new Condition<Diagnostic>() {
             @Override
             public boolean value(Diagnostic diagnostic) {
+                if (diagnostic == null) return false;
                 return kotlinSuppressCache.getFilter().invoke(diagnostic);
             }
         });
