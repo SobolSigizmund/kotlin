@@ -428,7 +428,9 @@ class QualifiedExpressionResolver(val symbolUsageValidator: SymbolUsageValidator
             else -> null
         }
 
-        if (qualifierDescriptor != null) {
+        // typeArguments != null means we're resolving LHS of double colon expression
+        // TODO: make it more obvious via different parameter names or types
+        if (qualifierDescriptor != null || typeArguments != null) {
             return storeResult(context.trace, expression, qualifierDescriptor, context.scope.ownerDescriptor, QualifierPosition.EXPRESSION,
                                typeArguments = typeArguments)
         }

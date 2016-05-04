@@ -224,6 +224,7 @@ class DoubleColonExpressionResolver(
     fun visitCallableReferenceExpression(expression: KtCallableReferenceExpression, c: ExpressionTypingContext): KotlinTypeInfo {
         val callableReference = expression.callableReference
         if (callableReference.getReferencedName().isEmpty()) {
+            expression.receiverExpression?.let { resolveDoubleColonLHS(it, expression, c) }
             c.trace.report(UNRESOLVED_REFERENCE.on(callableReference, callableReference))
             val errorType = ErrorUtils.createErrorType("Empty callable reference")
             return dataFlowAnalyzer.createCheckedTypeInfo(errorType, c, expression)
