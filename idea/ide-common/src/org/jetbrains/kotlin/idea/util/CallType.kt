@@ -18,6 +18,7 @@ package org.jetbrains.kotlin.idea.util
 
 import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.idea.resolve.ResolutionFacade
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
@@ -35,6 +36,7 @@ import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.resolve.scopes.receivers.ClassQualifier
 import org.jetbrains.kotlin.resolve.scopes.receivers.ExpressionReceiver
 import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.KotlinTypeImpl
 import org.jetbrains.kotlin.util.supertypesWithAny
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import org.jetbrains.kotlin.utils.addToStdlib.singletonOrEmptyList
@@ -54,7 +56,7 @@ sealed class CallType<TReceiver : KtElement?>(val descriptorKindFilter: Descript
 
     object OPERATOR : CallType<KtExpression>(DescriptorKindFilter.FUNCTIONS exclude NonOperatorExclude)
 
-    object CALLABLE_REFERENCE : CallType<KtTypeReference?>(DescriptorKindFilter.CALLABLES exclude CallableReferenceExclude)
+    object CALLABLE_REFERENCE : CallType<KtExpression?>(DescriptorKindFilter.CALLABLES exclude CallableReferenceExclude)
 
     object IMPORT_DIRECTIVE : CallType<KtExpression?>(DescriptorKindFilter.ALL)
 
@@ -119,7 +121,7 @@ sealed class CallTypeAndReceiver<TReceiver : KtElement?, TCallType : CallType<TR
     class SUPER_MEMBERS(receiver: KtSuperExpression) : CallTypeAndReceiver<KtSuperExpression, CallType.SUPER_MEMBERS>(CallType.SUPER_MEMBERS, receiver)
     class INFIX(receiver: KtExpression) : CallTypeAndReceiver<KtExpression, CallType.INFIX>(CallType.INFIX, receiver)
     class OPERATOR(receiver: KtExpression) : CallTypeAndReceiver<KtExpression, CallType.OPERATOR>(CallType.OPERATOR, receiver)
-    class CALLABLE_REFERENCE(receiver: KtTypeReference?) : CallTypeAndReceiver<KtTypeReference?, CallType.CALLABLE_REFERENCE>(CallType.CALLABLE_REFERENCE, receiver)
+    class CALLABLE_REFERENCE(receiver: KtExpression?) : CallTypeAndReceiver<KtExpression?, CallType.CALLABLE_REFERENCE>(CallType.CALLABLE_REFERENCE, receiver)
     class IMPORT_DIRECTIVE(receiver: KtExpression?) : CallTypeAndReceiver<KtExpression?, CallType.IMPORT_DIRECTIVE>(CallType.IMPORT_DIRECTIVE, receiver)
     class PACKAGE_DIRECTIVE(receiver: KtExpression?) : CallTypeAndReceiver<KtExpression?, CallType.PACKAGE_DIRECTIVE>(CallType.PACKAGE_DIRECTIVE, receiver)
     class TYPE(receiver: KtExpression?) : CallTypeAndReceiver<KtExpression?, CallType.TYPE>(CallType.TYPE, receiver)
@@ -130,7 +132,7 @@ sealed class CallTypeAndReceiver<TReceiver : KtElement?, TCallType : CallType<TR
         fun detect(expression: KtSimpleNameExpression): CallTypeAndReceiver<*, *> {
             val parent = expression.parent
             if (parent is KtCallableReferenceExpression) {
-                return CallTypeAndReceiver.CALLABLE_REFERENCE(parent.typeReference)
+                return CallTypeAndReceiver.CALLABLE_REFERENCE(parent.receiverExpression)
             }
 
             val receiverExpression = expression.getReceiverExpression()
@@ -214,10 +216,6 @@ fun CallTypeAndReceiver<*, *>.receiverTypes(
 ): Collection<KotlinType>? {
     val receiverExpression: KtExpression?
     when (this) {
-        is CallTypeAndReceiver.CALLABLE_REFERENCE -> {
-            return receiver?.let { bindingContext[BindingContext.TYPE, it] }.singletonOrEmptyList()
-        }
-
         is CallTypeAndReceiver.DEFAULT -> receiverExpression = null
 
         is CallTypeAndReceiver.DOT -> receiverExpression = receiver
@@ -225,6 +223,10 @@ fun CallTypeAndReceiver<*, *>.receiverTypes(
         is CallTypeAndReceiver.INFIX -> receiverExpression = receiver
         is CallTypeAndReceiver.OPERATOR -> receiverExpression = receiver
         is CallTypeAndReceiver.DELEGATE -> receiverExpression = receiver
+        is CallTypeAndReceiver.CALLABLE_REFERENCE -> {
+            receiverExpression = receiver
+            if (receiverExpression == null) return emptyList()
+        }
 
         is CallTypeAndReceiver.SUPER_MEMBERS -> {
             val qualifier = receiver.superTypeQualifier
@@ -251,8 +253,12 @@ fun CallTypeAndReceiver<*, *>.receiverTypes(
     val receiverValues = if (receiverExpression != null) {
         val receiverType =
                 bindingContext.getType(receiverExpression) ?:
-                (bindingContext.get(BindingContext.QUALIFIER, receiverExpression) as? ClassQualifier)?.let {
-                    it.descriptor.classValueType
+                // TODO: TypeParameterQualifier? (T::hashCode)
+                (bindingContext.get(BindingContext.QUALIFIER, receiverExpression) as? ClassQualifier)?.let { classQualifier ->
+                    val classDescriptor = classQualifier.descriptor
+                    classQualifier.typeArguments?.let { typeArguments ->
+                        KotlinTypeImpl.create(Annotations.EMPTY, classDescriptor, false /* TODO (!) */, typeArguments)
+                    } ?: classDescriptor.classValueType
                 } ?:
                 return emptyList()
         listOf(ExpressionReceiver.create(receiverExpression, receiverType, bindingContext))

@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.idea.util.CallTypeAndReceiver
 import org.jetbrains.kotlin.idea.util.toFuzzyType
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.resolve.scopes.receivers.ClassQualifier
 import org.jetbrains.kotlin.types.KotlinTypeImpl
 import org.jetbrains.kotlin.types.TypeProjectionImpl
 import org.jetbrains.kotlin.types.TypeSubstitutor
@@ -94,7 +95,16 @@ object KeywordValues {
         }
 
         if (callTypeAndReceiver is CallTypeAndReceiver.CALLABLE_REFERENCE && callTypeAndReceiver.receiver != null) {
-            val qualifierType = bindingContext[BindingContext.TYPE, callTypeAndReceiver.receiver]
+            val receiverExpression = callTypeAndReceiver.receiver!!
+            // TODO: consider combining this with CallTypeAndReceiver#receiverTypes
+            val qualifierType =
+                    bindingContext.getType(receiverExpression) ?:
+                    (bindingContext.get(BindingContext.QUALIFIER, receiverExpression) as? ClassQualifier)?.let { classQualifier ->
+                        KotlinTypeImpl.create(
+                                Annotations.EMPTY, classQualifier.descriptor, false /* TODO (!) */, classQualifier.typeArguments!!
+                        )
+                    }
+
             if (qualifierType != null) {
                 val kClassDescriptor = resolutionFacade.getFrontendService(ReflectionTypes::class.java).kClass
                 val classLiteralType = KotlinTypeImpl.create(Annotations.EMPTY, kClassDescriptor, false, listOf(TypeProjectionImpl(qualifierType)))

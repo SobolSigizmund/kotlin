@@ -30,7 +30,10 @@ import org.jetbrains.kotlin.idea.core.*
 import org.jetbrains.kotlin.idea.intentions.OperatorToFunctionIntention
 import org.jetbrains.kotlin.idea.intentions.RemoveExplicitTypeArgumentsIntention
 import org.jetbrains.kotlin.idea.intentions.setType
-import org.jetbrains.kotlin.idea.util.*
+import org.jetbrains.kotlin.idea.util.CommentSaver
+import org.jetbrains.kotlin.idea.util.IdeDescriptorRenderers
+import org.jetbrains.kotlin.idea.util.ImportInsertHelper
+import org.jetbrains.kotlin.idea.util.getResolutionScope
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
@@ -246,23 +249,23 @@ private fun ConstructedExpressionWrapper.processTypeParameterUsages(resolvedCall
         }
 
         // for class literal ("X::class") we need type arguments only for kotlin.Array
-        val typeClassifier = type.constructor.declarationDescriptor
-        val classLiteralTypeElement = if (typeElement is KtUserType && typeElement.typeArgumentList == null || typeClassifier == null || KotlinBuiltIns.isArray(type)) {
-            typeElement
+        val typeClassifier = type.constructor.declarationDescriptor ?: return
+        val typeClassifierName = IdeDescriptorRenderers.SOURCE_CODE.renderClassifierName(typeClassifier)
+        val typeArgumentList = if (typeElement is KtUserType && KotlinBuiltIns.isArray(type)) {
+            typeElement.typeArgumentList
         }
         else {
-            factory.createType(IdeDescriptorRenderers.SOURCE_CODE.renderClassifierName(typeClassifier)).typeElement!!
+            null
         }
 
         for (usage in usages) {
             val parent = usage.parent
-            if (parent is KtUserType) {
-                if (parent.parent is KtTypeReference && parent.parent.parent is KtClassLiteralExpression) {
-                    parent.replace(classLiteralTypeElement)
-                }
-                else {
-                    parent.replace(typeElement)
-                }
+            // TODO (!): qualified expressions
+            if (parent is KtClassLiteralExpression) {
+                replaceExpression(usage, KtPsiFactory(usage).createExpression(typeClassifierName + typeArgumentList?.text.orEmpty()))
+            }
+            else if (parent is KtUserType) {
+                parent.replace(typeElement)
             }
             else {
                 //TODO: tests for this?

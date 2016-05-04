@@ -125,12 +125,16 @@ fun KtElement.renderTrimmed(): String {
         }
 
         override fun visitClassLiteralExpression(expression: KtClassLiteralExpression) {
-            expression.typeReference?.accept(this)
+            expression.receiverExpression?.accept(this)
             builder.append("::class")
         }
 
         override fun visitCallableReferenceExpression(expression: KtCallableReferenceExpression) {
-            expression.typeReference?.accept(this)
+            // TODO: it seems that this code is untested
+            expression.receiverExpression?.accept(this)
+            if (expression.hasQuestionMarks) {
+                builder.append("?")
+            }
             builder.append("::")
             builder.append(expression.callableReference.getReferencedName())
         }
