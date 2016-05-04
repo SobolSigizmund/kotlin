@@ -53,15 +53,6 @@ import org.jetbrains.kotlin.types.expressions.ExpressionTypingUtils
 import org.jetbrains.kotlin.utils.Printer
 import org.jetbrains.kotlin.utils.ThrowingList
 
-fun resolveCallableReferenceReceiverType(
-        callableReferenceExpression: KtCallableReferenceExpression,
-        context: ResolutionContext<*>,
-        typeResolver: TypeResolver
-): KotlinType? =
-        callableReferenceExpression.typeReference?.let {
-            typeResolver.resolveType(context.scope, it, context.trace, false)
-        }
-
 private fun <D : CallableDescriptor> ResolveArgumentsMode.acceptResolution(results: OverloadResolutionResults<D>, trace: TemporaryTraceAndCache) {
     when (this) {
         ResolveArgumentsMode.SHAPE_FUNCTION_ARGUMENTS ->
@@ -93,6 +84,7 @@ private fun resolvePossiblyAmbiguousCallableReference(
 
 private fun OverloadResolutionResults<*>.isSomething(): Boolean = !isNothing
 
+// TODO: move to DoubleColonExpressionResolver
 fun resolvePossiblyAmbiguousCallableReference(
         callableReferenceExpression: KtCallableReferenceExpression,
         lhsType: KotlinType?,
@@ -100,7 +92,7 @@ fun resolvePossiblyAmbiguousCallableReference(
         resolutionMode: ResolveArgumentsMode,
         callResolver: CallResolver
 ): OverloadResolutionResults<CallableDescriptor>? {
-    val reference = callableReferenceExpression.getCallableReference()
+    val reference = callableReferenceExpression.callableReference
 
     fun resolveInScope(traceTitle: String, classifier: ClassifierDescriptor, staticScope: MemberScope): OverloadResolutionResults<CallableDescriptor> {
 
@@ -157,28 +149,6 @@ fun resolvePossiblyAmbiguousCallableReference(
     if (possibleWithReceiver.isSomething()) return possibleWithReceiver
 
     return null
-}
-
-fun resolveCallableReferenceTarget(
-        callableReferenceExpression: KtCallableReferenceExpression,
-        lhsType: KotlinType?,
-        context: ResolutionContext<*>,
-        resolvedToSomething: BooleanArray,
-        callResolver: CallResolver
-): CallableDescriptor? {
-    val resolutionResults = resolvePossiblyAmbiguousCallableReference(
-            callableReferenceExpression, lhsType, context, ResolveArgumentsMode.RESOLVE_FUNCTION_ARGUMENTS, callResolver)
-    return resolutionResults?.let { results ->
-        if (results.isSomething()) {
-            resolvedToSomething[0] = true
-            OverloadResolutionResultsUtil.getResultingCall(results, context.contextDependency)?.let { call ->
-                call.resultingDescriptor
-            }
-        }
-        else {
-            null
-        }
-    }
 }
 
 private fun bindFunctionReference(expression: KtCallableReferenceExpression, type: KotlinType, context: ResolutionContext<*>) {
@@ -287,7 +257,7 @@ fun createReflectionTypeForResolvedCallableReference(
 fun getResolvedCallableReferenceShapeType(
         reference: KtCallableReferenceExpression,
         lhsType: KotlinType?,
-        overloadResolutionResults: OverloadResolutionResults<CallableDescriptor>?,
+        overloadResolutionResults: OverloadResolutionResults<*>?,
         context: ResolutionContext<*>,
         expectedTypeUnknown: Boolean,
         reflectionTypes: ReflectionTypes,
