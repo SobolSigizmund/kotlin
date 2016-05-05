@@ -35,15 +35,14 @@ import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.VfsTestUtil;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.containers.ContainerUtil;
-import com.intellij.util.ui.UIUtil;
 import junit.framework.ComparisonFailure;
 import kotlin.collections.ArraysKt;
 import kotlin.collections.CollectionsKt;
 import kotlin.jvm.functions.Function1;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.TestFile;
-import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinDaemonAnalyzerTestCase;
+import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.quickfix.utils.QuickfixTestUtilsKt;
 import org.jetbrains.kotlin.idea.test.ConfigLibraryUtil;
 import org.jetbrains.kotlin.idea.test.DirectiveBasedActionUtils;
@@ -261,61 +260,64 @@ public abstract class AbstractQuickFixMultiFileTest extends KotlinDaemonAnalyzer
                 configureByFiles(null, beforeFileName);
             }
 
-            CommandProcessor.getInstance().executeCommand(getProject(), new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        PsiFile psiFile = getFile();
+            PsiFile psiFile = myFile;
+            Pair<String, Boolean> pair = LightQuickFixTestCase.parseActionHint(psiFile, originalFileText);
+            String text = pair.getFirst();
 
-                        Pair<String, Boolean> pair = LightQuickFixTestCase.parseActionHint(psiFile, originalFileText);
-                        String text = pair.getFirst();
+            boolean actionShouldBeAvailable = pair.getSecond();
 
-                        boolean actionShouldBeAvailable = pair.getSecond();
+            if (psiFile instanceof KtFile) {
+                DirectiveBasedActionUtils.INSTANCE.checkForUnexpectedErrors((KtFile) psiFile);
+            }
 
-                        if (psiFile instanceof KtFile) {
-                            DirectiveBasedActionUtils.INSTANCE.checkForUnexpectedErrors((KtFile) psiFile);
-                        }
+            try {
+                doAction(text, actionShouldBeAvailable, beforeFileName);
+            }
+            catch (ComparisonFailure e) {
+                throw e;
+            }
+            catch (AssertionError e) {
+                throw e;
+            }
+            catch (Throwable e) {
+                e.printStackTrace();
+                fail(getTestName(true));
+            }
 
-                        doAction(text, actionShouldBeAvailable, beforeFileName);
+            if (actionShouldBeAvailable) {
+                String afterFilePath = beforeFileName.replace(".before.Main.", ".after.");
 
-                        if (actionShouldBeAvailable) {
-                            String afterFilePath = beforeFileName.replace(".before.Main.", ".after.");
-                            try {
-                                checkResultByFile(afterFilePath);
-                            }
-                            catch (ComparisonFailure e) {
-                                KotlinTestUtils.assertEqualsToFile(new File(afterFilePath), getEditor());
-                            }
+                try {
+                    checkResultByFile(afterFilePath);
+                }
+                catch (ComparisonFailure e) {
+                    KotlinTestUtils.assertEqualsToFile(new File(afterFilePath), getEditor());
+                }
 
-                            PsiFile mainFile = myFile;
-                            String mainFileName = mainFile.getName();
-                            for (PsiFile file : mainFile.getContainingDirectory().getFiles()) {
-                                String fileName = file.getName();
-                                if (fileName.equals(mainFileName) || !fileName.startsWith(extraFileNamePrefix(myFile.getName()))) continue;
+                String mainFileName = mainFile.getName();
+                for (PsiFile file : psiFile.getContainingDirectory().getFiles()) {
+                    String fileName = file.getName();
+                    if (fileName.equals(mainFileName) || !fileName.startsWith(extraFileNamePrefix(myFile.getName()))) continue;
 
-                                String extraFileFullPath = beforeFileName.replace(mainFileName, fileName);
-                                File afterFile = new File(extraFileFullPath.replace(".before.", ".after."));
-                                if (afterFile.exists()) {
-                                    KotlinTestUtils.assertEqualsToFile(afterFile, file.getText());
-                                }
-                                else {
-                                    KotlinTestUtils.assertEqualsToFile(new File(extraFileFullPath), file.getText());
-                                }
-                            }
-                        }
+                    String extraFileFullPath = beforeFileName.replace(mainFileName, fileName);
+                    File afterFile = new File(extraFileFullPath.replace(".before.", ".after."));
+                    if (afterFile.exists()) {
+                        KotlinTestUtils.assertEqualsToFile(afterFile, file.getText());
                     }
-                    catch (ComparisonFailure e) {
-                        throw e;
-                    }
-                    catch (AssertionError e) {
-                        throw e;
-                    }
-                    catch (Throwable e) {
-                        e.printStackTrace();
-                        fail(getTestName(true));
+                    else {
+                        KotlinTestUtils.assertEqualsToFile(new File(extraFileFullPath), file.getText());
                     }
                 }
-            }, "", "");
+            }
+
+            //noinspection ConstantConditions
+            if (!shouldBeAvailableAfterExecution()) {
+                IntentionAction afterAction = LightQuickFixTestCase.findActionWithText(getAvailableActions(), text);
+
+                if (afterAction != null) {
+                    fail("Action '" + text + "' is still available after its invocation in test " + beforeFileName);
+                }
+            }
         }
         finally {
             if (withRuntime) {
@@ -351,17 +353,6 @@ public abstract class AbstractQuickFixMultiFileTest extends KotlinDaemonAnalyzer
             }
 
             ShowIntentionActionsHandler.chooseActionAndInvoke(getFile(), getEditor(), action, action.getText());
-
-            UIUtil.dispatchAllInvocationEvents();
-
-            //noinspection ConstantConditions
-            if (!shouldBeAvailableAfterExecution()) {
-                IntentionAction afterAction = LightQuickFixTestCase.findActionWithText(getAvailableActions(), text);
-
-                if (afterAction != null) {
-                    fail("Action '" + text + "' is still available after its invocation in test " + testFilePath);
-                }
-            }
         }
     }
 
