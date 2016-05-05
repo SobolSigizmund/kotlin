@@ -91,7 +91,8 @@ abstract class AbstractCodeInsightActionTest : KotlinLightCodeInsightFixtureTest
             if (isForced || isApplicableExpected) {
                 val afterFile = File("$path.after")
                 TestCase.assertTrue(afterFile.exists())
-                myFixture.checkResult(FileUtil.loadFile(afterFile, true))
+
+                KotlinTestUtils.assertEqualsToFile(afterFile, myFixture.editor);
 
                 checkExtra()
             }
