@@ -543,7 +543,7 @@ public class LockBasedStorageManager implements StorageManager {
                 public V invoke(KeyWithComputation<K, V> computation) {
                     return computation.computation.invoke();
                 }
-            });
+            }, null);
         }
 
         @Nullable
