@@ -18,7 +18,6 @@ package org.jetbrains.kotlin.psi
 
 import com.intellij.lang.ASTNode
 import com.intellij.psi.PsiElement
-import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.lexer.KtTokens
 
 abstract class KtDoubleColonExpression(node: ASTNode) : KtExpressionImpl(node) {
@@ -33,9 +32,6 @@ abstract class KtDoubleColonExpression(node: ASTNode) : KtExpressionImpl(node) {
 
     val hasQuestionMarks: Boolean
         get() = (doubleColonTokenReference.prevSibling as? ASTNode)?.elementType == KtTokens.QUEST
-
-    val typeReference: KtTypeReference?
-        get() = findChildByType(KtNodeTypes.TYPE_REFERENCE)
 
     val doubleColonTokenReference: PsiElement
         get() = findChildByType(KtTokens.COLONCOLON)!!

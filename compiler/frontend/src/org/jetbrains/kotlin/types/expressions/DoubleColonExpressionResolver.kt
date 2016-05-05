@@ -23,22 +23,18 @@ import org.jetbrains.kotlin.descriptors.ConstructorDescriptor
 import org.jetbrains.kotlin.descriptors.TypeParameterDescriptor
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.diagnostics.Errors.*
-import org.jetbrains.kotlin.diagnostics.Severity
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorUtils
-import org.jetbrains.kotlin.resolve.TemporaryBindingTrace
 import org.jetbrains.kotlin.resolve.TypeResolver
 import org.jetbrains.kotlin.resolve.callableReferences.createReflectionTypeForResolvedCallableReference
 import org.jetbrains.kotlin.resolve.callableReferences.resolvePossiblyAmbiguousCallableReference
 import org.jetbrains.kotlin.resolve.calls.CallExpressionResolver
 import org.jetbrains.kotlin.resolve.calls.CallResolver
 import org.jetbrains.kotlin.resolve.calls.callResolverUtil.ResolveArgumentsMode
-import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
 import org.jetbrains.kotlin.resolve.calls.context.TemporaryTraceAndCache
 import org.jetbrains.kotlin.resolve.calls.results.OverloadResolutionResults
 import org.jetbrains.kotlin.resolve.calls.results.OverloadResolutionResultsUtil
-import org.jetbrains.kotlin.resolve.calls.util.FakeCallableDescriptorForObject
 import org.jetbrains.kotlin.resolve.scopes.receivers.ClassQualifier
 import org.jetbrains.kotlin.resolve.scopes.receivers.ClassifierQualifier
 import org.jetbrains.kotlin.types.ErrorUtils
@@ -230,49 +226,9 @@ class DoubleColonExpressionResolver(
             return dataFlowAnalyzer.createCheckedTypeInfo(errorType, c, expression)
         }
 
-        val trace = TemporaryBindingTrace.create(c.trace, "Callable reference type")
-        val context = c.replaceBindingTrace(trace)
-        val (lhsResult, resolutionResults) = resolveCallableReference(expression, context, ResolveArgumentsMode.RESOLVE_FUNCTION_ARGUMENTS)
-        val result = getCallableReferenceType(expression, lhsResult, resolutionResults, context)
-        val hasErrors = hasErrors(trace) // Do not inline this local variable (execution order is important)
-        trace.commit()
-        if (!hasErrors && result != null) {
-            checkNoExpressionOnLHS(expression, c)
-        }
+        val (lhsResult, resolutionResults) = resolveCallableReference(expression, c, ResolveArgumentsMode.RESOLVE_FUNCTION_ARGUMENTS)
+        val result = getCallableReferenceType(expression, lhsResult, resolutionResults, c)
         return dataFlowAnalyzer.createCheckedTypeInfo(result, c, expression)
-    }
-
-    private fun hasErrors(trace: TemporaryBindingTrace): Boolean =
-            trace.bindingContext.diagnostics.all().any { diagnostic -> diagnostic.severity == Severity.ERROR }
-
-    private fun checkNoExpressionOnLHS(expression: KtCallableReferenceExpression, c: ExpressionTypingContext) {
-        val typeReference = expression.typeReference ?: return
-        var typeElement = typeReference.typeElement as? KtUserType ?: return
-
-        while (true) {
-            if (typeElement.typeArgumentList != null) return
-            typeElement = typeElement.qualifier ?: break
-        }
-
-        val simpleNameExpression = typeElement.referenceExpression ?: return
-
-        val traceAndCache = TemporaryTraceAndCache.create(c, "Resolve expression on LHS of callable reference", simpleNameExpression)
-        val resolutionResult = callExpressionResolver.resolveSimpleName(c.replaceTraceAndCache(traceAndCache), simpleNameExpression)
-
-        val resultingCalls = resolutionResult.resultingCalls.filter { call ->
-            call.status.possibleTransformToSuccess() && !ErrorUtils.isError(call.resultingDescriptor)
-        }
-        if (resultingCalls.isEmpty()) return
-
-        if (resultingCalls.singleOrNull()?.resultingDescriptor is FakeCallableDescriptorForObject) return
-
-        throw AssertionError(String.format(
-                "Expressions on left-hand side of callable reference are not supported yet.\n" +
-                "Resolution result: %s\n" +
-                "Original result: %s",
-                resultingCalls.map { call -> call.resultingDescriptor },
-                expression.callableReference.getResolvedCall(c.trace.bindingContext)?.resultingDescriptor
-        ))
     }
 
     private fun getCallableReferenceType(
