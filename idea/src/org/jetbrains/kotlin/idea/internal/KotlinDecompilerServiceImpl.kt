@@ -30,9 +30,9 @@ class KotlinDecompilerServiceImpl : KotlinDecompilerService {
     override fun decompile(file: KtFile): String {
         val generationState = KotlinBytecodeToolWindow.compileSingleFile(file, true, true, true)
 
-        val bytecodeMap = hashMapOf<String, ByteArray>()
+        val bytecodeMap = hashMapOf<File, ByteArray>()
         generationState.factory.asList().filter { FileUtilRt.extensionEquals(it.relativePath, "class") }.forEach {
-            bytecodeMap["/${it.relativePath}"] = it.asByteArray()
+            bytecodeMap[File("/${it.relativePath}").absoluteFile] = it.asByteArray()
         }
 
         val bytecodeProvider = KotlinBytecodeProvider(bytecodeMap)
@@ -42,14 +42,16 @@ class KotlinDecompilerServiceImpl : KotlinDecompilerService {
         )
         val decompiler = BaseDecompiler(bytecodeProvider, resultSaver, options, IdeaLogger())
         for (path in bytecodeMap.keys) {
-            decompiler.addSpace(File(path), true)
+            decompiler.addSpace(path, true)
         }
         decompiler.decompileContext()
         return resultSaver.resultText
     }
 
-    class KotlinBytecodeProvider(val bytecodeMap: Map<String, ByteArray>) : IBytecodeProvider {
-        override fun getBytecode(externalPath: String?, internalPath: String?) = bytecodeMap[externalPath]
+    class KotlinBytecodeProvider(val bytecodeMap: Map<File, ByteArray>) : IBytecodeProvider {
+        override fun getBytecode(externalPath: String?, internalPath: String?): ByteArray? {
+            return bytecodeMap[File(externalPath)]
+        }
     }
 
     class KotlinResultSaver : IResultSaver {
