@@ -22,7 +22,6 @@ import com.intellij.util.Processor;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.jetbrains.annotations.NotNull;
@@ -59,9 +58,26 @@ public abstract class KotlinCompileMojoBase<A extends CommonCompilerArguments> e
     @Parameter
     private List<String> sourceDirs;
 
-    public List<String> getSources() {
+    protected List<String> getSourcesRaw() {
         if (sourceDirs != null && !sourceDirs.isEmpty()) return sourceDirs;
         return defaultSourceDirs;
+    }
+
+    public List<File> getSourceDirs() {
+        List<String> sources = getSourcesRaw();
+        List<File> result = new ArrayList<File>(sources.size());
+        File baseDir = project.getBasedir();
+
+        for (String source : sources) {
+            File f = new File(source);
+            if (f.isAbsolute()) {
+                result.add(f);
+            } else {
+                result.add(new File(baseDir, source));
+            }
+        }
+
+        return result;
     }
 
     /**
@@ -151,11 +167,10 @@ public abstract class KotlinCompileMojoBase<A extends CommonCompilerArguments> e
     }
 
     private boolean hasKotlinFilesInSources() throws MojoExecutionException {
-        List<String> sources = getSources();
+        List<File> sources = getSourceDirs();
         if (sources == null || sources.isEmpty()) return false;
 
-        for (String source : sources) {
-            File root = new File(source);
+        for (File root : sources) {
             if (root.exists()) {
                 boolean sourcesExists = !FileUtil.processFilesRecursively(root, new Processor<File>() {
                     @Override
@@ -229,9 +244,9 @@ public abstract class KotlinCompileMojoBase<A extends CommonCompilerArguments> e
         }
 
         List<String> sources = new ArrayList<String>();
-        for (String source : getSources()) {
-            if (new File(source).exists()) {
-                sources.add(source);
+        for (File source : getSourceDirs()) {
+            if (source.exists()) {
+                sources.add(source.getPath());
             }
             else {
                 getLog().warn("Source root doesn't exist: " + source);
