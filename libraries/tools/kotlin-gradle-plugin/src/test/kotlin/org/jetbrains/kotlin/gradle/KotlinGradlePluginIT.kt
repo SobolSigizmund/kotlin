@@ -3,6 +3,7 @@ package org.jetbrains.kotlin.gradle
 import org.gradle.api.logging.LogLevel
 import org.jetbrains.kotlin.gradle.plugin.CleanUpBuildListener
 import org.jetbrains.kotlin.gradle.tasks.USING_EXPERIMENTAL_INCREMENTAL_MESSAGE
+import org.jetbrains.kotlin.gradle.util.runningMaximum
 import org.junit.Test
 import java.io.File
 import kotlin.test.assertTrue
@@ -56,8 +57,8 @@ class KotlinGradleIT: BaseGradleIT() {
         val project = Project("kotlinProject", GRADLE_VERSION)
         val VARIANT_CONSTANT = "ForTest"
         val userVariantArg = "-Duser.variant=$VARIANT_CONSTANT"
-        val MEMORY_INITIAL_GROWTH_LIMIT_KB = 2500
         val MEMORY_MAX_GROWTH_LIMIT_KB = 500
+        val BUILD_COUNT = 15
 
         fun exitTestDaemon() {
             project.build(userVariantArg, "exit", options = BaseGradleIT.BuildOptions(withDaemon = true)) {
@@ -83,18 +84,14 @@ class KotlinGradleIT: BaseGradleIT() {
 
         try {
             val initialBuildMemory = buildAndGetMemoryAfterBuild()
-            val subsequentBuildMemory = (1..20).map { buildAndGetMemoryAfterBuild() }
-            val max = subsequentBuildMemory.max()!!
-            val max1 = subsequentBuildMemory.take(10).max()!!
-            val max2 = subsequentBuildMemory.drop(10).max()!!
+            val subsequentBuildMemory = (1..BUILD_COUNT).map { buildAndGetMemoryAfterBuild() }
+            val maximums = subsequentBuildMemory.runningMaximum() // monotonic function
+            val lowest = maximums.first()
+            val highest = maximums.last()
 
-            val initialGrowth = max - initialBuildMemory
-            assertTrue(initialGrowth <= MEMORY_INITIAL_GROWTH_LIMIT_KB,
-                    "Maximum used memory growth relative to initial used memory $initialGrowth (from $initialBuildMemory to $max) kb > $MEMORY_INITIAL_GROWTH_LIMIT_KB kb")
-
-            val maxGrowth = max2 - max1
+            val maxGrowth = highest - lowest
             assertTrue(maxGrowth <= MEMORY_MAX_GROWTH_LIMIT_KB,
-                    "Maximum used memory over series of builds growth $maxGrowth (from $max1 to $max2) kb > $MEMORY_MAX_GROWTH_LIMIT_KB kb")
+                    "Maximum used memory over series of builds growth $maxGrowth (from $lowest to $highest) kb > $MEMORY_MAX_GROWTH_LIMIT_KB kb")
 
             // testing that nothing remains locked by daemon, see KT-9440
             project.build(userVariantArg, "clean", options = BaseGradleIT.BuildOptions(withDaemon = true)) {
