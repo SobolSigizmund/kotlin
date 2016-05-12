@@ -3,7 +3,6 @@ package org.jetbrains.kotlin.gradle
 import org.gradle.api.logging.LogLevel
 import org.jetbrains.kotlin.gradle.plugin.CleanUpBuildListener
 import org.jetbrains.kotlin.gradle.tasks.USING_EXPERIMENTAL_INCREMENTAL_MESSAGE
-import org.jetbrains.kotlin.gradle.util.runningMaximum
 import org.junit.Test
 import java.io.File
 import kotlin.test.assertTrue
@@ -83,15 +82,15 @@ class KotlinGradleIT: BaseGradleIT() {
         exitTestDaemon()
 
         try {
-            val initialBuildMemory = buildAndGetMemoryAfterBuild()
-            val subsequentBuildMemory = (1..BUILD_COUNT).map { buildAndGetMemoryAfterBuild() }
-            val maximums = subsequentBuildMemory.runningMaximum() // monotonic function
-            val lowest = maximums.first()
-            val highest = maximums.last()
+            val usedMemory = (1..BUILD_COUNT).map { buildAndGetMemoryAfterBuild() }
 
-            val maxGrowth = highest - lowest
+            // ensure that the maximum of the used memory established after several first builds doesn't raise significantly in the subsequent builds
+            val establishedMaximum = usedMemory.take(5).max()!!
+            val totalMaximum = usedMemory.max()!!
+
+            val maxGrowth = totalMaximum - establishedMaximum
             assertTrue(maxGrowth <= MEMORY_MAX_GROWTH_LIMIT_KB,
-                    "Maximum used memory over series of builds growth $maxGrowth (from $lowest to $highest) kb > $MEMORY_MAX_GROWTH_LIMIT_KB kb")
+                    "Maximum used memory over series of builds growth $maxGrowth (from $establishedMaximum to $totalMaximum) kb > $MEMORY_MAX_GROWTH_LIMIT_KB kb")
 
             // testing that nothing remains locked by daemon, see KT-9440
             project.build(userVariantArg, "clean", options = BaseGradleIT.BuildOptions(withDaemon = true)) {
