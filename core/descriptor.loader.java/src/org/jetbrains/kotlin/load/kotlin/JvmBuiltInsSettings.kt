@@ -19,8 +19,7 @@ package org.jetbrains.kotlin.load.kotlin
 import org.jetbrains.kotlin.builtins.BuiltInsInitializer
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.descriptors.*
-import org.jetbrains.kotlin.descriptors.annotations.AnnotationsImpl
-import org.jetbrains.kotlin.descriptors.annotations.createDeprecatedAnnotation
+import org.jetbrains.kotlin.descriptors.annotations.*
 import org.jetbrains.kotlin.descriptors.impl.ClassDescriptorImpl
 import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
@@ -42,8 +41,8 @@ import org.jetbrains.kotlin.serialization.deserialization.PlatformDependentDecla
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedClassDescriptor
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.storage.StorageManager
-import org.jetbrains.kotlin.types.DelegatingType
-import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.*
+import org.jetbrains.kotlin.types.typeUtil.replaceAnnotations
 import org.jetbrains.kotlin.utils.DFS
 import org.jetbrains.kotlin.utils.SmartSet
 import org.jetbrains.kotlin.utils.addToStdlib.check
@@ -67,6 +66,10 @@ open class JvmBuiltInsSettings(
         moduleDescriptor.builtIns.createDeprecatedAnnotation(
                 "This member is not fully supported by Kotlin compiler, so it may be absent or have different signature in next major version"
         ).let { AnnotationsImpl(listOf(it)) }
+    }
+
+    private val unsafeVarianceAnnotationSubstitution = storageManager.createLazyValue {
+        UnsafeVarianceTypeSubstitution(moduleDescriptor.builtIns)
     }
 
     private fun createMockJavaIoSerializableType(): KotlinType {
@@ -102,13 +105,17 @@ open class JvmBuiltInsSettings(
             }
             .mapNotNull {
                 additionalMember ->
-                additionalMember.newCopyBuilder().apply {
+                val substitutedWithKotlinTypeParameters =
+                        additionalMember.substitute(
+                                createMappedTypeParametersSubstitution
+                                (additionalMember.containingDeclaration as ClassDescriptor, classDescriptor).buildSubstitutor()
+                        ) as SimpleFunctionDescriptor
+
+                substitutedWithKotlinTypeParameters.newCopyBuilder().apply {
                     setOwner(classDescriptor)
                     setDispatchReceiverParameter(classDescriptor.thisAsReceiverParameter)
                     setPreserveSourceElement()
-                    setSubstitution(createMappedTypeParametersSubstitution(
-                            additionalMember.containingDeclaration as ClassDescriptor, classDescriptor))
-
+                    setSubstitution(unsafeVarianceAnnotationSubstitution())
 
                     val memberStatus = additionalMember.getJdkMethodStatus()
                     when (memberStatus) {
@@ -444,4 +451,79 @@ private class FallbackBuiltIns private constructor() : KotlinBuiltIns(LockBasedS
     }
 
     override fun getPlatformDependentDeclarationFilter() = PlatformDependentDeclarationFilter.All
+}
+
+private class UnsafeVarianceTypeSubstitution(kotlinBuiltIns: KotlinBuiltIns) : TypeSubstitution() {
+    private val unsafeVarianceAnnotations = AnnotationsImpl(listOf(kotlinBuiltIns.createUnsafeVarianceAnnotation()))
+
+    override fun get(key: KotlinType) = null
+
+    override fun prepareTopLevelType(topLevelType: KotlinType, position: Variance): KotlinType {
+        val unsafeVariancePaths = mutableListOf<List<Int>>()
+        IndexedTypeHolder(topLevelType).checkTypePosition(
+                position,
+                { typeParameter, indexedTypeHolder, errorPosition ->
+                    unsafeVariancePaths.add(indexedTypeHolder.argumentIndices)
+                },
+                customVariance = { null })
+
+        if (unsafeVariancePaths.isEmpty()) return topLevelType
+
+        return topLevelType.annotatePartsWithUnsafeVariance(unsafeVariancePaths)
+    }
+
+    private fun KotlinType.annotatePartsWithUnsafeVariance(unsafeVariancePaths: Collection<List<Int>>): KotlinType {
+        if (unsafeVariancePaths.isEmpty()) return this
+
+        if (isFlexible()) {
+            return flexibility().factory.create(
+                    lowerIfFlexible().annotatePartsWithUnsafeVariance(relevantParts(unsafeVariancePaths, 0)),
+                    upperIfFlexible().annotatePartsWithUnsafeVariance(relevantParts(unsafeVariancePaths, 1))
+            )
+        }
+
+        // if root is unsafe
+        if (emptyList<Int>() in unsafeVariancePaths) {
+            return replaceAnnotations(composeAnnotations(annotations, unsafeVarianceAnnotations))
+        }
+
+        return replace(newArguments = arguments.withIndex().map {
+                    val (index, argument) = it
+                    if (argument.isStarProjection) return@map argument
+                    TypeProjectionImpl(
+                            argument.projectionKind,
+                            argument.type.annotatePartsWithUnsafeVariance(relevantParts(unsafeVariancePaths, index)))
+                })
+    }
+
+    private fun relevantParts(unsafeVariancePaths: Collection<List<Int>>, index: Int) =
+            unsafeVariancePaths.filter { it[0] == index }.map { it.subList(1, it.size) }
+
+    private class IndexedTypeHolder(
+            override val type: KotlinType,
+            val argumentIndices: List<Int> = emptyList()
+    ) : TypeHolder<IndexedTypeHolder> {
+        override val flexibleBounds: Pair<IndexedTypeHolder, IndexedTypeHolder>? get() =
+            if (type.isFlexible())
+                Pair(
+                        IndexedTypeHolder(type.lowerIfFlexible(), argumentIndices + 0),
+                        IndexedTypeHolder(type.upperIfFlexible(), argumentIndices + 1))
+            else null
+
+        override val arguments: List<TypeHolderArgument<IndexedTypeHolder>>
+            get() = type.arguments.withIndex().map { projectionWithIndex ->
+
+                val (index, projection) = projectionWithIndex
+                object : TypeHolderArgument<IndexedTypeHolder> {
+                    override val projection: TypeProjection
+                        get() = projection
+                    override val typeParameter: TypeParameterDescriptor?
+                        get() = type.constructor.parameters[index]
+                    override val holder: IndexedTypeHolder
+                        get() = IndexedTypeHolder(projection.type, argumentIndices + index)
+
+                }
+            }
+
+    }
 }
