@@ -369,7 +369,7 @@ class ImportInsertHelperImpl(private val project: Project) : ImportInsertHelper(
             //TODO: it's a temporary hack for JetCodeFragment's and non-physical files
             // We should increment modification tracker after inserting import to invalidate resolve caches.
             // Without this modification references with new import won't be resolved.
-            (PsiModificationTracker.SERVICE.getInstance(project) as PsiModificationTrackerImpl).incOutOfCodeBlockModificationCounter()
+//            (PsiModificationTracker.SERVICE.getInstance(project) as PsiModificationTrackerImpl).incOutOfCodeBlockModificationCounter()
 
             val importPath = ImportPath(fqName, allUnder)
 
