@@ -122,7 +122,7 @@ abstract class CompletionSession(
         val nameFilter = prefixMatcher.asNameFilter()
         val getOrSetPrefix = listOf("get", "set", "ge", "se", "g", "s").firstOrNull { prefix.startsWith(it) }
         if (getOrSetPrefix != null)
-            nameFilter or prefixMatcher.cloneWithPrefix(prefix.removePrefix(getOrSetPrefix).decapitalizeSmart()).asNameFilter()
+            prefixMatcher.cloneWithPrefix(prefix.removePrefix(getOrSetPrefix).decapitalizeSmart()).asNameFilter() or nameFilter
         else
             nameFilter
     }
