@@ -9,6 +9,10 @@
 
 ### Compiler
 
+### JS
+
+- Improve performance of mutable maps and sets
+
 ### IDE
 
 New features:
