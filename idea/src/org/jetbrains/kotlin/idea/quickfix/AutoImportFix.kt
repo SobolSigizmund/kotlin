@@ -26,6 +26,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.packageDependencies.DependencyValidationManager
 import com.intellij.psi.PsiFile
+import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiModificationTracker
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithVisibility
@@ -118,8 +119,7 @@ internal abstract class AutoImportFixBase<T: KtExpression>(expression: T) :
         }
     }
 
-    fun computeSuggestionsForName(name: Name, callTypeAndReceiver: CallTypeAndReceiver<*, *>):
-            Collection<DeclarationDescriptor> {
+    fun computeSuggestionsForName(name: Name, callTypeAndReceiver: CallTypeAndReceiver<*, *>): Collection<DeclarationDescriptor> {
         val nameStr = name.asString()
         if (nameStr.isEmpty()) return emptyList()
 
@@ -128,11 +128,11 @@ internal abstract class AutoImportFixBase<T: KtExpression>(expression: T) :
         fun filterByCallType(descriptor: DeclarationDescriptor) = callTypeAndReceiver.callType.descriptorKindFilter.accepts(descriptor)
 
         val searchScope = getResolveScope(file)
+        if (searchScope == GlobalSearchScope.EMPTY_SCOPE) return emptyList()
 
         val bindingContext = element.analyze(BodyResolveMode.PARTIAL)
 
         val diagnostics = bindingContext.diagnostics.forElement(element)
-
         if (!diagnostics.any { it.factory in getSupportedErrors() }) return emptyList()
 
         val resolutionFacade = element.getResolutionFacade()
